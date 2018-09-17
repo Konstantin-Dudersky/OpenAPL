@@ -1,0 +1,1382 @@
+﻿FUNCTION_BLOCK "Pcs7AnIn"
+TITLE = 'Analog input driver'
+{ S7_Optimized_Access := 'FALSE' }
+AUTHOR : AdvLib90
+FAMILY : Channel
+NAME : Pcs7AnIn
+VERSION : 9.0
+   VAR_INPUT 
+      PV_In : Word;   // Input value
+      PV_InSlv { CFC_Visible := 'false'} : Word;   // Input value of slave channel
+      ProImQB { CFC_Visible := 'false'} : Bool;   // Quality bit from Processimage
+      ProImQBSlv { CFC_Visible := 'false'} : Bool;   // Quality bit from Processimage of slave channel
+      ChValueAct { CFC_Visible := 'false'} : Byte;   // reserved
+      Scale : Struct   // Range of process value
+         High : Real := 100.0;   // High Value
+         Low : Real;   // Low Value
+      END_STRUCT;
+      PV_InUnit { CFC_EnumerationTexts := 'true'} : Int := 1001;   // Unit of process value
+      Feature { CFC_Visible := 'false'} : Struct   // Status of various features
+         Bit0 : Bool;   // Reserved
+         Bit1 : Bool;   // Reserved
+         Bit2 : Bool;   // Reserved
+         Bit3 : Bool;   // Reserved
+         Bit4 : Bool;   // Reserved
+         Bit5 : Bool;   // 1 = Low cut off input value
+         Bit6 : Bool;   // Reserved
+         Bit7 : Bool;   // Reserved
+         Bit8 : Bool;   // Reserved
+         Bit9 : Bool;   // Reserved
+         Bit10 : Bool;   // 1 = Condition Monitoring
+         Bit11 : Bool;   // Reserved
+         Bit12 : Bool;   // Reserved
+         Bit13 : Bool;   // Reserved
+         Bit14 : Bool;   // Reserved
+         Bit15 : Bool;   // Reserved
+         Bit16 : Bool;   // Reserved
+         Bit17 : Bool;   // Reserved
+         Bit18 : Bool;   // Reserved
+         Bit19 : Bool;   // Reserved
+         Bit20 : Bool;   // Reserved
+         Bit21 : Bool;   // Reserved
+         Bit22 : Bool;   // Reserved
+         Bit23 : Bool;   // Reserved
+         Bit24 : Bool;   // Reserved
+         Bit25 : Bool;   // Reserved
+         Bit26 : Bool;   // Reserved
+         Bit27 : Bool;   // Reserved
+         Bit28 : Bool := TRUE;   // 1 = Bad Value
+         Bit29 : Bool;   // 1 = Substitute value
+         Bit30 : Bool;   // 1 = Hold last value
+         Bit31 : Bool;   // Reserved
+      END_STRUCT;
+      NamurOff { CFC_Visible := 'false'} : Bool;   // 1=NAMUR limits off
+      HighLimit { CFC_Visible := 'false'} : Real := 21.5;   // High limit of input value(4-20mA)
+      LowLimit { CFC_Visible := 'false'} : Real := 3.3;   // Low limit of input value(4-20mA)
+      SimOn : Struct   // 1=Simulation active
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      SimPV_In : Struct   // Simulation value
+         Value : Real;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      SubsPV_In : Real;   // Substitution value
+      SelQB { CFC_Visible := 'false'} : Bool;   // 1=Select Qualitybit from Processimage
+      DeltaVal { CFC_Visible := 'false'} : Real;   // Delta value(PV.value - LastValidValue)
+      CountLim { CFC_Visible := 'false'} : Int;   // Restart counter limit
+      MS_Release { CFC_Visible := 'true'} : Struct   // Maintenance release
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      MS : DWord;   // Maintenance state
+      MS_Ext { CFC_Interconnectable := 'true'} : DWord;   // External Maintenance state
+      TextRef { CFC_Interconnectable := 'true'} : Word;   // Text reference external messages
+      FlutEn { CFC_Visible := 'false'} : Bool;   // 1=Fluttersupress enable
+      FlutTmIn { CFC_Visible := 'false'} : Int;   // Fluttersupress time
+      FrznEn { CFC_Visible := 'false'} : Bool;   // Enable monitoring for frozen input value (In)
+      FrznTmIn { CFC_Visible := 'false'; CFC_ForTest := 'true'} : Real;   // Monitoring time of frozen imput value [s]
+      DelMsgEn { CFC_Visible := 'false'} : Bool;   // Reserve
+      DelMsgTm { CFC_Visible := 'false'} : Int;   // Reserve
+      SampleTime { CFC_Visible := 'false'; CFC_Interconnectable := 'false'; CFC_Configurable := 'false'} : Real := 0.1;   // Sample Time[s]
+      LowCutOff { CFC_Visible := 'false'} : Real;   // Low cut off input value
+   END_VAR
+
+   VAR_OUTPUT 
+      Bad : Struct   // 1=Bad process value
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      PV_Out : Struct   // Process value incl. ST
+         Value : Real;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      PV_OutUnit : Int;   // Unit of process value
+      ScaleOut : Struct   // Range of process value
+         High : Real := 100.0;   // High Value
+         Low : Real;   // Low Value
+      END_STRUCT;
+      PV_HiAct { CFC_Visible := 'false'} : Struct   // 1=Input value high limit failure
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      PV_LoAct { CFC_Visible := 'false'} : Struct   // 1=Input value low limit failure
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      SimAct { CFC_Visible := 'false'} : Struct   // 1=Simulation active
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      ModErr { CFC_Visible := 'false'} : Struct   // 1=Higher level failure
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      FrznVal { CFC_Visible := 'false'} : Struct   // frozen input value
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      RemMonTm { CFC_Visible := 'false'} : Real;   // remaining monitoring time
+      ErrorNum { CFC_Visible := 'false'} : Int := -1;   // Parameter error
+      OosAct { CFC_ForTest := 'true'} : Struct   // Field device out of service, maintenance in pogress
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      PV_LcoAct { CFC_Visible := 'false'} : Struct   // 1=Low cut off limit failure
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      MS_Req : Struct   // Maintenance request
+         Value : Bool;   // Value
+         ST : Byte := BYTE#16#80;   // Signal Status
+      END_STRUCT;
+      MS_Dev : DWord;   // Maintenance State
+   END_VAR
+
+   VAR_IN_OUT 
+      Mode : DWord;   // Quality and mode
+      DataXchg : DWord;   // Data exchange
+      DataXchg1 : DWord;   // Data exchange
+      MS_Xchg : DWord;   // Maintenance State exchange
+   END_VAR
+
+   VAR 
+      LastValidValue : Real;
+      LastValidValue1 : Real;
+      LastPV_In : Word;
+      LastBad : Bool;
+      DeltaOn : Bool;
+      CntRes : Int;   // Restart counter
+      _r : Array[0..7] of Byte;
+      SxFirstStart : Bool := TRUE;   // First start
+      LastByQuality : Byte;
+   END_VAR
+
+   VAR_TEMP 
+      F_4mA : Bool;   // Fehler bei den NAMUR- oder Ersatz-Grenzen
+      HiLoUngl : Bool;   // High Range = Low Range
+      M4mA : Bool;   // Hilfsmerker 4 bis 20 mA
+      Status : Bool;   // WertStatus des Analogwertes
+      StatusM : Bool;   // Status Bereichdes Analogwertes
+      BadAkt : Bool;   // Status Messbereichkodierung
+      Except0_10V : Bool;   // Ausnahme Bereich 0-10V
+      SubOn : Bool;   // true = substitution on error active
+      LaValOn : Bool;   // true = last valid value on error active
+      xFeatBadValue : Bool;   // 1=Bad Value will be issued
+      xInEquLastIn : Bool;   // PV_In is equal to last PV_In
+      xFrznMonEn : Bool;   // monitoring of frozen values is on
+      xMode80 : Bool;   // MODE = 16#80xxxxxx
+      ByQuality : Byte;
+      Low_sc : Int;   // Untere physische Grenze
+      UnderCnt : Int;   // Untersteuergrenze
+      OverCnt : Int;   // Übersteuergrenze
+      InVal : Int;   // Analogeingang word
+      InValR : Real;   // Analogeingang in mA real
+      LoScalR : Real;
+      FactPh : Real;   // Faktor für Messwertberechnung
+      LastValT : Real;
+      FlutTm : DWord;   // Flatterunterdrückungszeit
+      Overflow : Int;   // Überlaufgrenze
+      DeltaUnd : Int;   // Differenz Unterlaufgrenze
+      MS_AS : DWord;   // Maintenance State AS
+      xFeatLowCutOff : Bool;   // 1=LowCutOff enabled
+      xConditionMonitoring : Bool;   // 1=ConditionMonitoring
+      xPvMasterOk : Bool;   // master signal (PV)
+      xPvSlaveOk : Bool;   // master signal (PV)
+   END_VAR
+
+
+BEGIN
+	
+	
+	IF #SxFirstStart THEN
+	    #SxFirstStart := false;
+	    #ErrorNum := 0;
+	END_IF;
+	// A7d0
+	#Except0_10V := false;
+	#xFeatLowCutOff := #Feature.Bit5;
+	#xFeatBadValue := #Feature.Bit28;
+	#xConditionMonitoring := #Feature.Bit10;
+	IF NOT (#xFeatBadValue OR #Feature.Bit29 OR #Feature.Bit30) THEN
+	    #xFeatBadValue := true;
+	END_IF;
+	// A7d1
+	IF (((#Mode AND 16#FF00) = 16#700) AND ((#Mode AND 16#FF) <> 16#C))
+	    OR ((#Mode AND 16#FF00) = 16#800)
+	    OR ((#Mode AND 16#FF00) = 16#900)
+	    OR ((#Mode AND 16#FF00) = 16#A00)
+	    OR ((#Mode AND 16#FF00) = 16#B00)
+	    OR ((#Mode AND 16#FF00) = 16#C00)
+	    OR ((#Mode AND 16#FF00) = 16#D00)
+	    OR ((#Mode AND 16#FF00) = 16#E00)
+	    OR ((#Mode AND 16#FF00) = 16#F00)
+	THEN
+	    IF 16#800000 = (#Mode AND 16#800000) THEN
+	        #PV_InUnit := 1002;
+	    END_IF;
+	END_IF;
+	// A7d2
+	#ScaleOut.High := #Scale.High;
+	#ScaleOut.Low := #Scale.Low;
+	#PV_OutUnit := #PV_InUnit;
+	
+	
+	#OosAct.Value := ((#MS AND 16#F000000) = 16#5000000) OR ((#MS AND 16#F000000) = 16#6000000) OR ((#MS AND 16#F000000) = 16#7000000);
+	IF #xConditionMonitoring THEN
+	    #DataXchg1 := #DataXchg1 OR 16#1;
+	ELSE    // A7d4
+	    #DataXchg1 := #DataXchg1 AND 16#FFFFFFFE;
+	END_IF;
+	// A7d5
+	IF #MS_Release.Value THEN
+	    #DataXchg := #DataXchg OR 16#1;
+	ELSE    // A7d6
+	    #DataXchg := #DataXchg AND 16#FFFFFFFE;
+	END_IF;
+	// A7d7
+	#MS_Dev := #MS;
+	#DataXchg1 := #DataXchg1 AND 16#FFFF;
+	#MS_Xchg := 16#0;
+	IF #xConditionMonitoring THEN
+	    #MS_Xchg := #MS_Ext;
+	    #DataXchg1 := SHL(IN := WORD_TO_DWORD(#TextRef), N := 16) OR #DataXchg1;
+	END_IF;
+	// A7d8
+	#MS_Req.Value := DWORD_TO_BOOL(SHR(IN := (#DataXchg1 AND 16#2), N := 1));
+	
+	IF #FlutTmIn > 255 THEN
+	    #FlutTmIn := 255;
+	END_IF;
+	// A7d9
+	IF #FlutEn THEN
+	    #FlutTm := SHL(IN := INT_TO_DWORD(#FlutTmIn), N := 24);
+	    #DataXchg := #DataXchg AND 16#FFFFFF;
+	    #DataXchg := #DataXchg OR #FlutTm;
+	    #DataXchg := #DataXchg OR 16#2;
+	ELSE    // A7da
+	    #DataXchg := #DataXchg AND 16#FFFFFD;
+	END_IF;
+	// A7db
+	
+	#xPvMasterOk := (#ProImQB AND #SelQB) OR NOT #SelQB;
+	#xPvSlaveOk := #ProImQBSlv AND #SelQB;
+	
+	#xMode80 := 16#80000000 = (#Mode AND 16#FF000000);
+	#Status := (16#20000000 = (#Mode AND 16#FF000000)) OR #xMode80 OR #SimOn.Value;
+	#xFrznMonEn := (#FrznTmIn > 0.0) AND #xMode80 AND #FrznEn;
+	#ModErr.Value := 16#40000000 = (#Mode AND 16#FF000000);
+	#SubOn := NOT #xFeatBadValue AND #Feature.Bit29;
+	#LaValOn := NOT (#Feature.Bit29 OR #xFeatBadValue) AND #Feature.Bit30;
+	#F_4mA := false;
+	#LoScalR := #Scale.Low;
+	#Low_sc := -27648;
+	#UnderCnt := -27648;
+	#OverCnt := 27648;
+	#Overflow := 32512;
+	IF DWORD_TO_INT(#Mode AND 16#FFFF) = 264 THEN
+	    #DeltaUnd := 1;
+	ELSE    // A7
+	    #DeltaUnd := 4865;
+	END_IF;
+	// A7
+	#M4mA := false;
+	#InValR := #Scale.High - #LoScalR;
+	IF #InValR = 0.0 THEN
+	    #HiLoUngl := false;
+	    #InValR := 1.0;
+	    #LoScalR := 0.0;
+	    #Low_sc := 0;
+	    #FactPh := 0.1;
+	ELSE    // A7
+	    #HiLoUngl := true;
+	    #FactPh := 1.808449e-005;
+	END_IF;
+	// A7
+	#InVal := DWORD_TO_INT(#Mode AND 16#FFFF);
+	#StatusM := false;
+	CASE WORD_TO_INT(INT_TO_WORD(#InVal) AND 16#FF00) OF
+	    256:
+	        // A7
+	        CASE #InVal OF
+	            257:
+	                // A7
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 2.8935184236615896e-3;
+	                END_IF;
+	            258:    // A7
+	                // A7
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 9.042245335876942e-3;
+	                END_IF;
+	            259:    // A7
+	                // A7
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 1.8084490671753883e-2;
+	                END_IF;
+	            260:    // A7
+	                // A7
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                END_IF;
+	            261:    // A7
+	                // A7
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 9.042245073942468e-5;
+	                END_IF;
+	            262:    // A7
+	                // A7
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 1.8084490147884935e-4;
+	                END_IF;
+	            263:    // A7
+	                // A7
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #Low_sc := 0;
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A7
+	                    #FactPh := 1.4467592700384557e-4;
+	                    #Low_sc := -6912;
+	                END_IF;
+	            264:    // A7
+	                // A7
+	                #UnderCnt := 0;
+	                #Low_sc := 0;
+	                #Except0_10V := true;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A7
+	                    #FactPh := 3.616898175096139e-4;
+	                END_IF;
+	            265:    // A7
+	                // A7
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-4;
+	                END_IF;
+	            266:    // A7
+	                // A8
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 9.04224521946162e-4;
+	                END_IF;
+	            267:    // A8
+	                // A8
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 1.8084490671753883e-3;
+	                END_IF;
+	            268:    // A8
+	                // A8
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-3;
+	                END_IF;
+	            269:    // A8
+	                // A8
+	                #Low_sc := 0;
+	                #UnderCnt := 0;
+	                #FactPh := 3.616898175096139e-5;
+	            ELSE    // A8
+	                #Status := false;
+	                #StatusM := true;
+	        END_CASE;
+	        // A7
+	    512:    // A7
+	        // A7
+	        CASE #InVal OF
+	            512:
+	                // A8
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 1.1574074596865103e-4;
+	                END_IF;
+	            513:    // A8
+	                // A8
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-4;
+	                END_IF;
+	            514:    // A8
+	                // A8
+	                #Low_sc := 0;
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 7.233796059153974e-4;
+	                END_IF;
+	            515:    // A8
+	                // A8
+	                #M4mA := true;
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #Low_sc := 0;
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 5.787037080153823e-4;
+	                    #Low_sc := -6912;
+	                END_IF;
+	            516:    // A8
+	                // A8
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 7.233796059153974e-4;
+	                END_IF;
+	            517:    // A8
+	                // A8
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 1.8084490671753883e-4;
+	                END_IF;
+	            ELSE    // A8
+	                #Status := false;
+	                #StatusM := true;
+	        END_CASE;
+	        // A8
+	    768:    // A8
+	        // A8
+	        CASE #InVal OF
+	            770:
+	                // A8
+	                IF #HiLoUngl THEN
+	                    #Low_sc := 0;
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 7.233796059153974e-4;
+	                END_IF;
+	            771:    // A8
+	                // A8
+	                #M4mA := true;
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #Low_sc := 0;
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 5.787037080153823e-4;
+	                    #Low_sc := -6912;
+	                END_IF;
+	            772:    // A82b
+	                // A82e
+	                IF NOT #HiLoUngl THEN
+	                    #FactPh := 7.233796059153974e-4;
+	                END_IF;
+	            774:    // A82f
+	                // A831
+	                IF #HiLoUngl THEN
+	                    #Low_sc := 0;
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A833
+	                    #FactPh := 3.616898175096139e-4;
+	                END_IF;
+	            ELSE    // A832
+	                #Status := false;
+	                #StatusM := true;
+	        END_CASE;
+	        // A825
+	    1024, 1280, 1536:   // A8
+	        // A8
+	        #Low_sc := 0;
+	        CASE WORD_TO_INT((INT_TO_WORD(#InVal) AND 16#FF)) OF
+	            0:
+	                // A8
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 1.7361111240461469e-3;
+	                END_IF;
+	            2:  // A8
+	                // A8
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 5.42534701526165e-3;
+	                END_IF;
+	            4:  // A8
+	                // A8
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 1.08506940305233e-2;
+	                END_IF;
+	            6:  // A8
+	                // A8
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A84
+	                    #FactPh := 2.17013880610466e-2;
+	                END_IF;
+	            7:  // A8
+	                // A8
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 1.085069477558136e-1;
+	                END_IF;
+	            8:  // A8
+	                // A8
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 2.170138955116272e-1;
+	                END_IF;
+	            14: // A8
+	                // A8
+	                #UnderCnt := 0;
+	                IF #HiLoUngl THEN
+	                    #FactPh := 3.616898175096139e-5;
+	                ELSE    // A8
+	                    #FactPh := 3.616898175096139e-2;
+	                END_IF;
+	            15: // A8
+	                // A8
+	                #FactPh := 1.0;
+	                #InValR := 1.0;
+	            ELSE    // A8
+	                #Status := false;
+	                #StatusM := true;
+	        END_CASE;
+	        // A83
+	    1792:   // A8
+	        // A8
+	        #Low_sc := 0;
+	        IF (#Mode AND 16#100000) = 16#100000 THEN
+	            #FactPh := 0.1;
+	            IF #PV_InUnit = 1002 THEN
+	                CASE WORD_TO_INT((INT_TO_WORD(#InVal) AND 16#FF)) OF
+	                    0:
+	                        // A8
+	                        #UnderCnt := 320;
+	                        #OverCnt := 27865;
+	                        #Overflow := 32767;
+	                        #DeltaUnd := 1841;
+	                    1:  // A8
+	                        // A8
+	                        #UnderCnt := -4540;
+	                        #OverCnt := 23720;
+	                        #Overflow := 28221;
+	                        #DeltaUnd := 4541;
+	                    2:  // A8
+	                        // A8
+	                        #UnderCnt := -4540;
+	                        #OverCnt := 18320;
+	                        #Overflow := 21921;
+	                        #DeltaUnd := 4541;
+	                    3:  // A8
+	                        // A8
+	                        #OverCnt := 32162;
+	                        #UnderCnt := -580;
+	                        #Overflow := 32767;
+	                        #DeltaUnd := 2741;
+	                    4:  // A8
+	                        // A8
+	                        #OverCnt := 32162;
+	                        #UnderCnt := -580;
+	                        #Overflow := 32767;
+	                        #DeltaUnd := 2741;
+	                    5:  // A8
+	                        // A8
+	                        #OverCnt := 21920;
+	                        #UnderCnt := -3460;
+	                        #Overflow := 26421;
+	                        #DeltaUnd := 3461;
+	                    6:  // A8
+	                        // A8
+	                        #OverCnt := 16520;
+	                        #UnderCnt := -3280;
+	                        #Overflow := 21021;
+	                        #DeltaUnd := 3281;
+	                    7:  // A8
+	                        // A8
+	                        #OverCnt := 7520;
+	                        #UnderCnt := -4540;
+	                        #Overflow := 10041;
+	                        #DeltaUnd := 4541;
+	                    8:  // A8
+	                        // A8
+	                        #OverCnt := 25016;
+	                        #UnderCnt := -4540;
+	                        #Overflow := 29517;
+	                        #DeltaUnd := 4541;
+	                    9:  // A8
+	                        // A8
+	                        #OverCnt := 11120;
+	                        #UnderCnt := -3280;
+	                        #Overflow := 15621;
+	                        #DeltaUnd := 3281;
+	                    10: // A8
+	                        // A8
+	                        #OverCnt := 27865;
+	                        #UnderCnt := 320;
+	                        #Overflow := 32767;
+	                        #DeltaUnd := 1841;
+	                    11: // A8
+	                        // A8
+	                        #OverCnt := 14720;
+	                        #UnderCnt := -3280;
+	                        #Overflow := 19221;
+	                        #DeltaUnd := 3281;
+	                    ELSE    // A8
+	                        #Status := false;
+	                        #StatusM := true;
+	                END_CASE;
+	                // A8
+	            ELSE    // A8
+	                CASE WORD_TO_INT((INT_TO_WORD(#InVal) AND 16#FF)) OF
+	                    0:
+	                        // A8
+	                        #UnderCnt := 0;
+	                        #OverCnt := 18200;
+	                        #Overflow := 20701;
+	                        #DeltaUnd := 1201;
+	                    1:  // A8
+	                        // A8
+	                        #UnderCnt := -2700;
+	                        #OverCnt := 13000;
+	                        #Overflow := 15501;
+	                        #DeltaUnd := 2701;
+	                    2:  // A8
+	                        // A8
+	                        #UnderCnt := -2700;
+	                        #OverCnt := 10000;
+	                        #Overflow := 12001;
+	                        #DeltaUnd := 2701;
+	                    3:  // A8
+	                        // A8
+	                        #OverCnt := 17690;
+	                        #UnderCnt := -500;
+	                        #Overflow := 20191;
+	                        #DeltaUnd := 1701;
+	                    4:  // A8
+	                        // A87
+	                        #OverCnt := 17690;
+	                        #UnderCnt := -500;
+	                        #Overflow := 20191;
+	                        #DeltaUnd := 1701;
+	                    5:  // A8
+	                        // A8
+	                        #OverCnt := 12000;
+	                        #UnderCnt := -2100;
+	                        #Overflow := 14501;
+	                        #DeltaUnd := 2101;
+	                    6:  // A8
+	                        // A8
+	                        #OverCnt := 9000;
+	                        #UnderCnt := -2000;
+	                        #Overflow := 11501;
+	                        #DeltaUnd := 2001;
+	                    7:  // A8
+	                        // A8
+	                        #OverCnt := 4000;
+	                        #UnderCnt := -2700;
+	                        #Overflow := 5401;
+	                        #DeltaUnd := 2701;
+	                    8:  // A8
+	                        // A8
+	                        #OverCnt := 13720;
+	                        #UnderCnt := -2700;
+	                        #Overflow := 16221;
+	                        #DeltaUnd := 2701;
+	                    9:  // A8
+	                        // A8
+	                        #OverCnt := 6000;
+	                        #UnderCnt := -2000;
+	                        #Overflow := 8501;
+	                        #DeltaUnd := 2001;
+	                    10: // A8
+	                        // A8
+	                        #OverCnt := 23150;
+	                        #UnderCnt := 0;
+	                        #Overflow := 25001;
+	                        #DeltaUnd := 1201;
+	                    11: // A8
+	                        // A8
+	                        #OverCnt := 8000;
+	                        #UnderCnt := -2000;
+	                        #Overflow := 10501;
+	                        #DeltaUnd := 2001;
+	                    ELSE:   // A88
+	                        #Status := false;
+	                        #StatusM := true;
+	                END_CASE;
+	                // A8
+	            END_IF;
+	        ELSE    // A8
+	            CASE #InVal OF
+	                1804:
+	                    // A8
+	                    #M4mA := true;
+	                    #UnderCnt := 0;
+	                    IF #HiLoUngl THEN
+	                        #FactPh := 3.616898175096139e-5;
+	                    ELSE    // A8
+	                        #FactPh := 5.787037080153823e-4;
+	                        #Low_sc := -6912;
+	                    END_IF;
+	                ELSE:   // A8
+	                    #Status := false;
+	                    #StatusM := true;
+	            END_CASE;
+	            // A8
+	        END_IF;
+	    2048, 2304, 3840:    // A8
+	        // A8
+	        #Low_sc := 0;
+	        IF #PV_InUnit = 1002 THEN
+	            CASE WORD_TO_INT((INT_TO_WORD(#InVal) AND 16#FF)) OF
+	                0:
+	                    // A8
+	                    #UnderCnt := -18400;
+	                    #OverCnt := 26600;
+	                    #FactPh := 0.01;
+	                    #Overflow := 31101;
+	                    #DeltaUnd := 22901;
+	                1:  // A8
+	                    // A8
+	                    #OverCnt := 28000;
+	                    #UnderCnt := -7600;
+	                    #FactPh := 0.01;
+	                    #Overflow := 32767;
+	                    #DeltaUnd := 15701;
+	                2, 3, 4, 5, 85, 87, 89, 91: // A8
+	                    // A8
+	                    #OverCnt := 15620;
+	                    #UnderCnt := -3280;
+	                    #FactPh := 0.1;
+	                    #Overflow := 18321;
+	                    #DeltaUnd := 4055;
+	                6:  // A8
+	                    // A8
+	                    #OverCnt := 4820;
+	                    #UnderCnt := -760;
+	                    #FactPh := 0.1;
+	                    #Overflow := 5631;
+	                    #DeltaUnd := 1571;
+	                7, 8, 9, 20, 22, 24, 26:  // A8
+	                    // A8
+	                    #UnderCnt := -18400;
+	                    #OverCnt := 26600;
+	                    #FactPh := 0.01;
+	                    #Overflow := 31101;
+	                    #DeltaUnd := 22901;
+	                10, 13, 17, 19: // A8
+	                    // A8
+	                    IF (#Mode AND 16#100000) = 16#100000 THEN
+	                        #OverCnt := 5720;
+	                        #UnderCnt := -400;
+	                        #FactPh := 0.1;
+	                        #Overflow := 6671;
+	                        #DeltaUnd := 527;
+	                    ELSE    // A8
+	                        #OverCnt := 28000;
+	                        #UnderCnt := -7600;
+	                        #FactPh := 0.01;
+	                        #Overflow := 32767;
+	                        #DeltaUnd := 15701;
+	                    END_IF;
+	                11, 12, 16, 18: // A8
+	                    // A8
+	                    IF (#Mode AND 16#100000) = 16#100000 THEN
+	                        #OverCnt := 3470;
+	                        #UnderCnt := -670;
+	                        #FactPh := 0.1;
+	                        #Overflow := 4034;
+	                        #DeltaUnd := 846;
+	                    ELSE    // A8
+	                        #OverCnt := 4820;
+	                        #UnderCnt := -760;
+	                        #FactPh := 0.1;
+	                        #Overflow := 5631;
+	                        #DeltaUnd := 1571;
+	                    END_IF;
+	                14: // A8
+	                    // A8
+	                    #OverCnt := 28000;
+	                    #UnderCnt := -5800;
+	                    #FactPh := 0.01;
+	                    #Overflow := 32767;
+	                    #DeltaUnd := 7601;
+	                15: // A8
+	                    // A8
+	                    #OverCnt := 5000;
+	                    #UnderCnt := -3280;
+	                    #FactPh := 0.1;
+	                    #Overflow := 5937;
+	                    #DeltaUnd := 4001;
+	                21, 23, 25, 27: // A8
+	                    // A8
+	                    #OverCnt := 20120;
+	                    #UnderCnt := -4360;
+	                    #FactPh := 0.1;
+	                    #Overflow := 23631;
+	                    #DeltaUnd := 4598;
+	                29, 31, 33: // A8
+	                    // A8
+	                    #OverCnt := 3920;
+	                    #UnderCnt := -580;
+	                    #FactPh := 0.1;
+	                    #Overflow := 4641;
+	                    #DeltaUnd := 761;
+	                157, 159, 161:  // A8
+	                    // A8
+	                    #OverCnt := 3920;
+	                    #UnderCnt := -3280;
+	                    #FactPh := 0.1;
+	                    #Overflow := 4641;
+	                    #DeltaUnd := 4055;
+	                28, 30, 32: // A8
+	                    // A8
+	                    #OverCnt := 28000;
+	                    #UnderCnt := -5800;
+	                    #FactPh := 0.01;
+	                    #Overflow := 32767;
+	                    #DeltaUnd := 7601;
+	                34: // A8
+	                    // A8
+	                    #OverCnt := 28000;
+	                    #UnderCnt := -7600;
+	                    #FactPh := 0.01;
+	                    #Overflow := 32767;
+	                    #DeltaUnd := 15701;
+	                35: // A8
+	                    // A8
+	                    #OverCnt := 3560;
+	                    #UnderCnt := -760;
+	                    #FactPh := 0.1;
+	                    #Overflow := 4144;
+	                    #DeltaUnd := 1571;
+	                ELSE    // A8
+	                    #Status := false;
+	                    #StatusM := true;
+	            END_CASE;
+	            // A
+	        ELSE    // A8
+	            CASE WORD_TO_INT((INT_TO_WORD(#InVal) AND 16#FF)) OF
+	                0:
+	                    // A8
+	                    IF (#Mode AND 16#F00000) = 16#300000 THEN
+	                        #UnderCnt := -20000;
+	                        #OverCnt := 27648;
+	                        #FactPh := 0.01;
+	                        #Overflow := 32513;
+	                        #DeltaUnd := 24001;
+	                    ELSE    // A8
+	                        #UnderCnt := -12000;
+	                        #OverCnt := 13000;
+	                        #FactPh := 0.01;
+	                        #Overflow := 15501;
+	                        #DeltaUnd := 14501;
+	                    END_IF;
+	                1:  // A8
+	                    // A8
+	                    #OverCnt := 25000;
+	                    #UnderCnt := -6000;
+	                    #FactPh := 0.01;
+	                    #Overflow := 29501;
+	                    #DeltaUnd := 10501;
+	                2, 3, 4, 5, 85, 87, 89, 91: // A8
+	                    // A8
+	                    IF (#Mode AND 16#F00000) = 16#300000 THEN
+	                        #OverCnt := 8500;
+	                        #UnderCnt := -2000;
+	                        #FactPh := 0.1;
+	                        #Overflow := 13001;
+	                        #DeltaUnd := 2401;
+	                    ELSE    // A8
+	                        #OverCnt := 8500;
+	                        #UnderCnt := -2000;
+	                        #FactPh := 0.1;
+	                        #Overflow := 10001;
+	                        #DeltaUnd := 2431;
+	                    END_IF;
+	                6:  // A8
+	                    // A8
+	                    #OverCnt := 2500;
+	                    #UnderCnt := -600;
+	                    #FactPh := 0.1;
+	                    #Overflow := 2951;
+	                    #DeltaUnd := 1051;
+	                7, 8, 9, 20, 22, 24, 26:    // A8
+	                    // A8
+	                    IF (#Mode AND 16#F00000) = 16#300000 THEN
+	                        #UnderCnt := -20000;
+	                        #OverCnt := 27648;
+	                        #FactPh := 0.01;
+	                        #Overflow := 32513;
+	                        #DeltaUnd := 24001;
+	                    ELSE    // A8
+	                        #UnderCnt := -12000;
+	                        #OverCnt := 13000;
+	                        #FactPh := 0.01;
+	                        #Overflow := 15501;
+	                        #DeltaUnd := 14501;
+	                    END_IF;
+	                10, 13, 17, 19: // A8
+	                    // A8
+	                    IF (#Mode AND 16#100000) = 16#100000 THEN
+	                        #OverCnt := 3000;
+	                        #UnderCnt := -400;
+	                        #FactPh := 0.1;
+	                        #Overflow := 3529;
+	                        #DeltaUnd := 471;
+	                    ELSE    // A8
+	                        #OverCnt := 25000;
+	                        #UnderCnt := -6000;
+	                        #FactPh := 0.01;
+	                        #Overflow := 29501;
+	                        #DeltaUnd := 10501;
+	                    END_IF;
+	                11, 12, 16, 18: // A8
+	                    // A8
+	                    IF (#Mode AND 16#100000) = 16#100000 THEN
+	                        #OverCnt := 1750;
+	                        #UnderCnt := -550;
+	                        #FactPh := 0.1;
+	                        #Overflow := 2064;
+	                        #DeltaUnd := 648;
+	                    ELSE    // A8
+	                        #OverCnt := 2500;
+	                        #UnderCnt := -600;
+	                        #FactPh := 0.1;
+	                        #Overflow := 2951;
+	                        #DeltaUnd := 1051;
+	                    END_IF;
+	                14: // A8
+	                    // A8
+	                    #OverCnt := 15000;
+	                    #UnderCnt := -5000;
+	                    #FactPh := 0.01;
+	                    #Overflow := 18001;
+	                    #DeltaUnd := 6001;
+	                15: // A8
+	                    // A8
+	                    #OverCnt := 2600;
+	                    #UnderCnt := -2000;
+	                    #FactPh := 0.1;
+	                    #Overflow := 3121;
+	                    #DeltaUnd := 2401;
+	                21, 23, 25, 27: // A8
+	                    // A8
+	                    #OverCnt := 11000;
+	                    #UnderCnt := -2600;
+	                    #FactPh := 0.1;
+	                    #Overflow := 12951;
+	                    #DeltaUnd := 2733;
+	                29, 31, 33: // A8
+	                    // A8
+	                    #OverCnt := 2000;
+	                    #UnderCnt := -500;
+	                    #FactPh := 0.1;
+	                    #Overflow := 2401;
+	                    #DeltaUnd := 601;
+	                157, 159, 161:  // A8
+	                    // A8
+	                    #OverCnt := 2000;
+	                    #UnderCnt := -2000;
+	                    #FactPh := 0.1;
+	                    #Overflow := 2401;
+	                    #DeltaUnd := 2401;
+	                28, 30, 32: // A8
+	                    // A8
+	                    #OverCnt := 15000;
+	                    #UnderCnt := -5000;
+	                    #FactPh := 0.01;
+	                    #Overflow := 18001;
+	                    #DeltaUnd := 6001;
+	                34: // A8
+	                    // A8
+	                    #OverCnt := 18000;
+	                    #UnderCnt := -6000;
+	                    #FactPh := 0.01;
+	                    #Overflow := 21241;
+	                    #DeltaUnd := 10501;
+	                35: // A8
+	                    // A8
+	                    #OverCnt := 1800;
+	                    #UnderCnt := -600;
+	                    #FactPh := 0.1;
+	                    #Overflow := 2125;
+	                    #DeltaUnd := 1051;
+	                ELSE    // A8
+	                    #Status := false;
+	                    #StatusM := true;
+	            END_CASE;
+	            // A8
+	        END_IF;
+	    2560, 2816, 3072, 3328, 3584:   // A8
+	        // A8
+	        #Low_sc := 0;
+	        #FactPh := 0.1;
+	        IF #PV_InUnit = 1002 THEN
+	            CASE WORD_TO_INT((INT_TO_WORD(#InVal) AND 16#FF)) OF
+	                0:
+	                    // A8
+	                    #UnderCnt := 320;
+	                    #OverCnt := 27865;
+	                    #Overflow := 32767;
+	                    #DeltaUnd := 1841;
+	                1:  // A8
+	                    // A8
+	                    #UnderCnt := -4540;
+	                    #OverCnt := 23720;
+	                    #Overflow := 28221;
+	                    #DeltaUnd := 4541;
+	                2:  // A8
+	                    // A8
+	                    #UnderCnt := -4540;
+	                    #OverCnt := 18320;
+	                    #Overflow := 21921;
+	                    #DeltaUnd := 4541;
+	                3:  // A8
+	                    // A8
+	                    #OverCnt := 32162;
+	                    #UnderCnt := -580;
+	                    #Overflow := 32767;
+	                    #DeltaUnd := 2741;
+	                4:  // A8
+	                    // A8
+	                    #OverCnt := 32162;
+	                    #UnderCnt := -580;
+	                    #Overflow := 32767;
+	                    #DeltaUnd := 2741;
+	                5:  // A8
+	                    // A8
+	                    #OverCnt := 21920;
+	                    #UnderCnt := -3460;
+	                    #Overflow := 26421;
+	                    #DeltaUnd := 3461;
+	                6:  // A8
+	                    // A8
+	                    #OverCnt := 16520;
+	                    #UnderCnt := -3280;
+	                    #Overflow := 21021;
+	                    #DeltaUnd := 3281;
+	                7:  // A8
+	                    // A8
+	                    #OverCnt := 7520;
+	                    #UnderCnt := -4540;
+	                    #Overflow := 10041;
+	                    #DeltaUnd := 4541;
+	                8:  // A8
+	                    // A8
+	                    #OverCnt := 25016;
+	                    #UnderCnt := -4540;
+	                    #Overflow := 29517;
+	                    #DeltaUnd := 4541;
+	                9:  // A8
+	                    // A8
+	                    #OverCnt := 11120;
+	                    #UnderCnt := -3280;
+	                    #Overflow := 15621;
+	                    #DeltaUnd := 3281;
+	                10: // A8
+	                    // A8
+	                    #OverCnt := 27865;
+	                    #UnderCnt := 320;
+	                    #Overflow := 32767;
+	                    #DeltaUnd := 1841;
+	                11: // A8
+	                    // A8
+	                    #OverCnt := 14720;
+	                    #UnderCnt := -3280;
+	                    #Overflow := 19221;
+	                    #DeltaUnd := 3281;
+	                ELSE:   // A8
+	                    #Status := false;
+	                    #StatusM := true;
+	            END_CASE;
+	            // A8
+	        ELSE    // A8
+	            CASE WORD_TO_INT((INT_TO_WORD(#InVal) AND 16#FF)) OF
+	                0:
+	                    // A8
+	                    IF (#Mode AND 16#F00000) = 16#300000 THEN
+	                        #UnderCnt := 0;
+	                        #OverCnt := 18200;
+	                        #Overflow := 20701;
+	                        #DeltaUnd := 1501;
+	                    ELSE    // A8
+	                        #UnderCnt := 0;
+	                        #OverCnt := 18200;
+	                        #Overflow := 20701;
+	                        #DeltaUnd := 1201;
+	                    END_IF;
+	                1:  // A8
+	                    // A9
+	                    #UnderCnt := -2700;
+	                    #OverCnt := 13000;
+	                    #Overflow := 15501;
+	                    #DeltaUnd := 2701;
+	                2:  // A9
+	                    // A9
+	                    #UnderCnt := -2700;
+	                    #OverCnt := 10000;
+	                    #Overflow := 12001;
+	                    #DeltaUnd := 2701;
+	                3:  // A9
+	                    // A9
+	                    #OverCnt := 17690;
+	                    #UnderCnt := -500;
+	                    #Overflow := 20191;
+	                    #DeltaUnd := 1701;
+	                4:  // A9
+	                    // A9
+	                    IF (#Mode AND 16#F00000) = 16#300000 THEN
+	                        #OverCnt := 17690;
+	                        #UnderCnt := -500;
+	                        #Overflow := 18501;
+	                        #DeltaUnd := 1701;
+	                    ELSE    // A9
+	                        #OverCnt := 17690;
+	                        #UnderCnt := -500;
+	                        #Overflow := 20191;
+	                        #DeltaUnd := 1701;
+	                    END_IF;
+	                5:  // A9
+	                    // A9
+	                    IF (#Mode AND 16#F00000) = 16#300000 THEN
+	                        #OverCnt := 12000;
+	                        #UnderCnt := -2100;
+	                        #Overflow := 13601;
+	                        #DeltaUnd := 2101;
+	                    ELSE    // A9
+	                        #OverCnt := 12000;
+	                        #UnderCnt := -2100;
+	                        #Overflow := 14501;
+	                        #DeltaUnd := 2101;
+	                    END_IF;
+	                6:  // A9
+	                    // A9
+	                    #OverCnt := 9000;
+	                    #UnderCnt := -2000;
+	                    #Overflow := 11501;
+	                    #DeltaUnd := 2001;
+	                7:  // A9
+	                    // A9
+	                    #OverCnt := 4000;
+	                    #UnderCnt := -2700;
+	                    #Overflow := 5401;
+	                    #DeltaUnd := 2701;
+	                8:  // A9
+	                    // A9
+	                    #OverCnt := 13720;
+	                    #UnderCnt := -2700;
+	                    #Overflow := 16221;
+	                    #DeltaUnd := 2701;
+	                9:  // A9
+	                    // A9
+	                    #OverCnt := 6000;
+	                    #UnderCnt := -2000;
+	                    #Overflow := 8501;
+	                    #DeltaUnd := 2001;
+	                10: // A9
+	                    // A9
+	                    #OverCnt := 23150;
+	                    #UnderCnt := 0;
+	                    #Overflow := 25001;
+	                    #DeltaUnd := 1201;
+	                11: // A9
+	                    // A9
+	                    #OverCnt := 8000;
+	                    #UnderCnt := -2000;
+	                    #Overflow := 10501;
+	                    #DeltaUnd := 2001;
+	                ELSE:   // A9
+	                    #Status := false;
+	                    #StatusM := true;
+	            END_CASE;
+	            // A8
+	        END_IF;
+	    ELSE:   // A8
+	        #Status := false;
+	        #StatusM := true;
+	END_CASE;
+	// A7
+	#FactPh := #FactPh * #InValR;
+	IF #SimOn.Value THEN
+	    #InValR := (#SimPV_In.Value - #LoScalR) / #FactPh + #Low_sc;
+	    #Status := true;
+	    IF (#InValR < 3.276700e+004) AND (#InValR > (#Low_sc - 5120)) THEN
+	        #InVal := DINT_TO_INT(ROUND(#InValR));
+	    ELSE
+	        IF #InValR >= 3.276700e+004 THEN    // A9
+	            #InVal := 32767;
+	        ELSE    // A9
+	            #InVal := #Low_sc - 5120;
+	        END_IF;
+	    END_IF;
+	    // A921
+	    #PV_LoAct.Value := (#InVal < #UnderCnt);
+	    #PV_HiAct.Value := (#InVal > #OverCnt);
+	ELSE    // A91f
+	    IF #xPvMasterOk THEN
+	        #InVal := WORD_TO_INT(#PV_In);
+	    ELSIF #xPvSlaveOk THEN    // A925
+	        #InVal := WORD_TO_INT(#PV_InSlv);
+	    ELSE    // A927
+	        #InVal := WORD_TO_INT(#PV_In);
+	    END_IF;
+	    // A926
+	    #PV_LoAct.Value := (#InVal < #UnderCnt) OR (16#40000 = (#Mode AND 16#40000));
+	    #PV_HiAct.Value := (#InVal > #OverCnt) OR (16#20000 = (#Mode AND 16#20000));
+	END_IF;
+	// A924
+	IF ((#InVal < #Overflow) AND (#InVal > (#Low_sc - #DeltaUnd))) AND ((16#0 <> (#Mode AND 16#FF000000)) OR #SimOn.Value) THEN
+	    IF #M4mA THEN
+	        #InValR := #InVal * 5.787037e-004 + 4.0;
+	        IF #NamurOff THEN
+	            #F_4mA := (#InValR > #HighLimit) OR (#InValR < #LowLimit);
+	        ELSE    // A9
+	            #F_4mA := (#InValR > 21.0) OR (#InValR < 3.6);
+	        END_IF;
+	        // A9
+	    END_IF;
+	ELSE    // A928
+	    #Status := false;
+	END_IF;
+	// A92c
+	
+	IF NOT #xPvMasterOk AND #xPvSlaveOk THEN
+	    #xInEquLastIn := (#PV_InSlv = #LastPV_In);
+	    #LastPV_In := #PV_InSlv;
+	ELSE    // A92d
+	    #xInEquLastIn := (#PV_In = #LastPV_In);
+	    #LastPV_In := #PV_In;
+	END_IF;
+	// A92e
+	
+	
+	IF NOT #xFrznMonEn OR #SimOn.Value THEN
+	    #FrznVal.Value := false;
+	    #RemMonTm := #FrznTmIn;
+	ELSIF (#FrznTmIn < #SampleTime) OR NOT #xInEquLastIn THEN // A9
+	    #FrznVal.Value := #xInEquLastIn;
+	    #RemMonTm := #FrznTmIn;
+	ELSIF (#RemMonTm > 0.0) THEN    // A9
+	    #RemMonTm := #RemMonTm - #SampleTime;
+	    IF NOT #xInEquLastIn THEN
+	        #FrznVal.Value := false;
+	        #RemMonTm := #FrznTmIn;
+	    END_IF;
+	    // A9
+	    IF #RemMonTm <= 0.0 AND #xInEquLastIn THEN
+	        #FrznVal.Value := true;
+	        #RemMonTm := 0.0;
+	    END_IF;
+	END_IF;
+	// A932
+	
+	//LastPV_In := PV_In;
+	#BadAkt := NOT #Status OR #F_4mA OR #FrznVal.Value OR (NOT #xPvMasterOk AND NOT #xPvSlaveOk);
+	
+	IF #SimOn.Value THEN
+	    #ByQuality := 16#60;
+	    #InValR := #SimPV_In.Value;
+	    #CntRes := 0;
+	ELSE    // A9
+	    IF #BadAkt THEN
+	        IF #SubOn THEN
+	            IF #LaValOn THEN
+	                #ByQuality := 16#0;
+	                #InValR := DINT_TO_REAL(INT_TO_DINT(#InVal) - INT_TO_DINT(#Low_sc)) * #FactPh + #LoScalR;
+	            ELSE    // A9
+	                #InValR := #SubsPV_In;
+	                #ByQuality := 16#60;
+	            END_IF;
+	        ELSE    // A9
+	            IF #LaValOn THEN
+	                #ByQuality := 16#60;
+	                #InValR := #LastValidValue;
+	                #LastValT := #LastValidValue1;
+	            ELSE    // A9
+	                #ByQuality := 16#0;
+	                #InValR := DINT_TO_REAL(INT_TO_DINT(#InVal) - INT_TO_DINT(#Low_sc)) * #FactPh + #LoScalR;
+	            END_IF;
+	        END_IF;
+	        // A9
+	        #CntRes := 0;
+	    ELSE    // A9
+	        #InValR := DINT_TO_REAL(INT_TO_DINT(#InVal) - INT_TO_DINT(#Low_sc)) * #FactPh + #LoScalR;
+	        #LastValT := #LastValidValue;
+	        #ByQuality := 16#80;
+	        IF #CountLim > 0 THEN
+	            IF (NOT #BadAkt AND #LastBad) OR ((#Mode AND 16#10000) = 16#10000) THEN
+	                IF #CntRes = 0 THEN
+	                    #CntRes := #CountLim;
+	                    #Mode := (#Mode AND 16#FFFEFFFF);
+	                END_IF;
+	            END_IF;
+	            // A9
+	            IF #CntRes > 0 THEN
+	                #CntRes := #CntRes - 1;
+	                #BadAkt := #CntRes > 0;
+	                IF #BadAkt THEN
+	                    IF #LaValOn OR #SubOn THEN
+	                        #ByQuality := 16#60;
+	                    ELSE    // A9
+	                        #ByQuality := 16#0;
+	                    END_IF;
+	                    // A9
+	                    #InValR := #LastValidValue;
+	                END_IF;
+	            END_IF;
+	        END_IF;
+	    END_IF;
+	    // A9
+	    IF #LaValOn THEN
+	        IF #DeltaVal > 0.0 THEN
+	            IF (#ByQuality = 16#60) OR ((#ByQuality = 16#80) AND NOT #DeltaOn) THEN
+	                IF ABS(#InValR - #LastValT) > #DeltaVal THEN
+	                    #InValR := #LastValT;
+	                    #LastValidValue := #LastValT;
+	                    #ByQuality := 16#60;
+	                    #DeltaOn := true;
+	                ELSE    // A9
+	                    #DeltaOn := false;
+	                END_IF;
+	            ELSE    // A9
+	                #DeltaOn := false;
+	            END_IF;
+	        ELSE    // A9
+	            #DeltaOn := false;
+	        END_IF;
+	    END_IF;
+	END_IF;
+	// A9
+	IF #InVal < 0 AND #Except0_10V THEN
+	    #ByQuality := 16#0;
+	    #InValR := #Scale.Low;
+	    #BadAkt := true;
+	END_IF;
+	// A9
+	#PV_Out.ST := #ByQuality;
+	#PV_Out.Value := #InValR;
+	#ModErr.Value := #ModErr.Value OR #StatusM;
+	#LastValidValue1 := #LastValidValue;
+	IF NOT #SimOn.Value AND #StatusM THEN
+	    #PV_Out.Value := 0.0;
+	END_IF;
+	// A9
+	IF (#PV_Out.Value < #LowCutOff) AND #xFeatLowCutOff THEN
+	    #PV_Out.Value := #Scale.Low;
+	    #PV_LcoAct.Value := true;
+	END_IF;
+	// A9
+	IF #PV_Out.Value > #LowCutOff THEN
+	    #PV_LcoAct.Value := false;
+	END_IF;
+	// A9
+	#Bad.Value := #BadAkt;
+	#SimAct.Value := #SimOn.Value;
+	#LastBad := #BadAkt;
+	#LastValidValue := #InValR;
+	IF DWORD_TO_INT(#MS AND 16#F) = 6 THEN
+	    #ByQuality := 16#68;
+	    #PV_Out.ST := 16#68;
+	ELSIF DWORD_TO_INT(#MS AND 16#F) = 5 THEN    // A9
+	    #ByQuality := 16#A4;
+	    #PV_Out.ST := 16#A4;
+	END_IF;
+	// A9
+	
+END_FUNCTION_BLOCK
+
