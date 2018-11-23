@@ -1,0 +1,107 @@
+﻿FUNCTION_BLOCK "LApl_Integral"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      Hold : Bool;   // 1 = Integration is held
+      In : "LApl_AnaVal";   // Analog input value
+      InHyst : Real;   // Hysteresis
+      OutHiLim : Real := 100.0;   // High limit of output value
+      OutLoLim : Real;   // Low limit of output value
+      OutTrkOn : Bool;   // 1 = Output Out tracks the set value (OutTrk I/O)
+      OutTrk : "LApl_AnaVal";   // Predifined value used for OutTrkOn = 1
+      SampleTime : Time := T#100ms;   // Sampling time
+      TI : Time := T#1s;   // Integral time constant
+   END_VAR
+
+   VAR_OUTPUT 
+      Out : "LApl_AnaVal";   // Integral value output
+      OutHiAct : Bool;   // 1 = High limit (OutHiLim) reached
+      OutLoAct : Bool;   // 1 = Low limit (OutLoLim) reached
+   END_VAR
+
+   VAR 
+      stat : Struct
+         old : Struct
+            In : Real;
+            Out : Real;
+         END_STRUCT;
+         state : "typeSM";
+      END_STRUCT;
+   END_VAR
+
+   VAR CONSTANT 
+      ST_INTEGRATE_BEGIN : Int;
+      ST_INTEGRATE : Int := 1;
+      ST_TRK : Int := 2;
+      ST_HOLD : Int := 3;
+   END_VAR
+
+
+BEGIN
+	CASE "SM_Case"(sampleTime := #SampleTime, inst := #stat.state) OF
+	    #ST_INTEGRATE_BEGIN:
+	        // начало интегрирования
+	        "SM_NewState"(newState := #ST_INTEGRATE,
+	                      inst := #stat.state);
+	        
+	        #stat.old.In := #In.Value;
+	        #stat.old.Out := #Out.Value;
+	        #Out.ST := #In.ST;
+	        
+	    #ST_INTEGRATE:
+	        // идет интегрирование
+	        #Out.Value := #stat.old.Out + (#stat.old.In + #In.Value) * DINT_TO_REAL(#SampleTime) / (2 * DINT_TO_REAL(#TI));
+	        
+	        #stat.old.In := #In.Value;
+	        #stat.old.Out := #Out.Value;
+	        
+	        IF #Hold THEN
+	            "SM_NewState"(newState := #ST_HOLD,
+	                          inst := #stat.state);
+	        ELSIF #OutTrkOn THEN
+	            "SM_NewState"(newState := #ST_TRK,
+	                          inst := #stat.state);
+	        END_IF;
+	        
+	    #ST_TRK:
+	        // замещение значения
+	        #Out := #OutTrk;
+	        IF #Hold THEN
+	            "SM_NewState"(newState := #ST_HOLD,
+	                          inst := #stat.state);
+	        ELSIF NOT #OutTrkOn THEN
+	            "SM_NewState"(newState := #ST_INTEGRATE_BEGIN,
+	                          inst := #stat.state);
+	        END_IF;
+	        
+	    #ST_HOLD:
+	        // останов интегрирования
+	        IF NOT #Hold AND #OutTrkOn THEN
+	            "SM_NewState"(newState := #ST_TRK,
+	                          inst := #stat.state);
+	        ELSIF NOT #Hold THEN
+	            "SM_NewState"(newState := #ST_INTEGRATE_BEGIN,
+	                          inst := #stat.state);
+	        END_IF;
+	        
+	    ELSE
+	        "SM_NewState"(newState := #ST_INTEGRATE_BEGIN,
+	                      inst := #stat.state);
+	        
+	END_CASE;
+	
+	// контроль пределов
+	// верхний предел
+	IF #Out.Value > #OutHiLim THEN
+	    #OutHiAct := true;
+	ELSIF #Out.Value < #OutHiLim - #InHyst THEN
+	    #OutHiAct := false;
+	END_IF;
+	// нижний предел
+	IF #Out.Value < #OutLoLim THEN
+	    #OutLoAct := true;
+	ELSIF #Out.Value > #OutLoLim + #InHyst THEN
+	    #OutLoAct := false;
+	END_IF;
+END_FUNCTION_BLOCK
+

@@ -1,0 +1,502 @@
+﻿FUNCTION_BLOCK "LApl_Mot"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      StartAut : Bool;
+      StopAut : Bool;
+      StartMan : Bool;
+      StopMan : Bool;
+      ModLiOp : Bool;
+      AutModOp : Bool;
+      ManModOp : Bool := true;
+      AutModLi : Bool;
+      ManModLi : Bool;
+      LocalLi : Bool;
+      LocalOp : Bool;
+      OosOp : Bool;
+      OosLi : Bool;
+      StartLocal : Bool;
+      StopLocal : Bool;
+      LocalSetting : Int;
+      FbkRun : Bool;
+      Monitor : Bool := true;
+      MonTiStatic : Time := T#3s;
+      MonTiDynamic : Time := T#3s;
+      MonTiDyStop : Time := T#3s;
+      IdleTime : Time := T#5s;
+      PulseWidth : Time := T#3s;
+      WarnTiMan : Time;
+      WarnTiAut : Time;
+      RapidStp : Bool;
+      RstOp : Bool;
+      RstLi : Bool;
+      BypProt : Bool;
+      Trip : Bool := true;
+      Permit : Bool := true;
+      Perm_en : Bool := true;
+      Intlock : Bool := true;
+      Intl_en : Bool := true;
+      Protect : Bool := true;
+      Prot_en : Bool := true;
+      StartForce : Bool;
+      StopForce : Bool;
+      MsgLock : Bool;
+      SampleTime : Time := T#100ms;
+      SimLiOp : Bool;
+      SimOnLi : Bool;
+      SimOn : Bool;
+      FaultExt : Bool;
+      CSF : Bool;
+      SimAV : Real;
+      SimAV_Li : Real;
+      AV_AH_Lim : Real := 95.0;
+      AV_WH_Lim : Real := 90.0;
+      AV_TH_Lim : Real := 85.0;
+      AV_TL_Lim : Real := 15.0;
+      AV_WL_Lim : Real := 10.0;
+      AV_AL_Lim : Real := 5.0;
+      AV_Hyst : Real := 1.0;
+      AV : Real;
+      Feature_1 : DWord := 2#00000000_00000000_00000000_00000000;
+      Feature2 : DWord := 2#00000000_00000000_00000000_00000000;
+      FeatureStruct : Struct
+         Bit9 : Bool;
+         Bit30 : Bool;
+         Bit31 : Bool;
+      END_STRUCT;
+   END_VAR
+
+   VAR_OUTPUT 
+      MonDynErr : Bool;
+      MonDynStopErr : Bool;
+      MonStaErr : Bool;
+      CurrMon : Time;
+      R_StpAct : Bool;
+      LockAct : Bool;
+      GrpErr : Bool;
+      RdyToStart : Bool;
+      RdyToReset : Bool;
+      WarnAct : Bool;
+      Start : Bool;
+      P_Start : Bool;
+      P_Stop : Bool := true;
+      P_Rst : Bool;
+      LocalAct : Bool;
+      AutAct : Bool;
+      ManAct : Bool := true;
+      OosAct : Bool;
+      FbkRunOut : Bool;
+      Run : Bool;
+      Stop : Bool;
+      AV_Out : Real;
+      Status1 : DWord;
+      Status2 : DWord;
+      Status3 : DWord;
+      Status4 : DWord;
+      ErrorNum : Int := -1;
+      Msgs : "typeMsgSum";
+   END_VAR
+
+   VAR 
+      Stat : Struct
+         State : "typeSM";
+         Old : Struct
+            StartAut : Bool;
+            StopAut : Bool;
+            Start : Bool;
+         END_STRUCT;
+         Err : Struct
+            GrpErr : Bool;
+            Trip : Bool;
+            FaultExt : Bool;
+            CSF : Bool;
+            MonDynErr : Bool;
+            MonDynStopErr : Bool;
+            MonStaErr : Bool;
+            Permit : Bool;
+            Intlock : Bool;
+            Protect : Bool;
+         END_STRUCT;
+         Start : Bool;
+         MonTiStaticAct : Time;
+         P_Start_Act : Time;
+         P_Stop_Act : Time;
+      END_STRUCT;
+      instOM : "LApl_Aux_OperatingModes";
+      msgTrip : "Msg";
+      instFeature : "LApl_Aux_FeatureBitsReorder";
+   END_VAR
+
+   VAR_TEMP 
+      tempRst : Bool;
+      tempStart : Bool;
+      tempStatus1 : DWord;
+      tempStatus1At AT tempStatus1 : Array[0..31] of Bool;
+      i : Int;
+      tbMonStaErrDiscrepancy : Bool;
+   END_VAR
+
+   VAR CONSTANT 
+      ST_STOP : Int;
+      ST_PREWARN : Int := 1;
+      ST_STARTING : Int := 2;
+      ST_RUN : Int := 3;
+      ST_STOPPING : Int := 4;
+      ST_IDLE : Int := 5;
+      ST_FORCESTART : Int := 6;
+   END_VAR
+
+
+BEGIN
+	#CurrMon := T#0ms;
+	
+	// Feature bits
+	#instFeature(FeatureIn := #Feature_1);
+	
+	// переключение режимов работы
+	#instOM(AutModLi := #AutModLi,
+	        Feature := #instFeature.Feature,
+	        LocalLi := #LocalLi,
+	        LocalSetting := #LocalSetting,
+	        ManModLi := #ManModLi,
+	        ModLiOp := #ModLiOp,
+	        OosLi := #OosLi,
+	        AutModOp := #AutModOp,
+	        LocalOp := #LocalOp,
+	        ManModOp_OnOp := #ManModOp,
+	        OosOp := #OosOp,
+	        AutAct => #AutAct,
+	        LocalAct => #LocalAct,
+	        ManAct_OnAct => #ManAct,
+	        OosAct => #OosAct);
+	
+	
+	// блокировки
+	IF #instOM.AutAct OR #instOM.ManAct_OnAct THEN
+	    #Stat.Err.Permit := NOT #Permit AND #Perm_en AND "SM_StateE"(state := #ST_STOP, inst := #Stat.State);
+	    #Stat.Err.Intlock := NOT #Intlock AND #Intl_en;
+	    IF NOT #Protect AND #Prot_en THEN
+	        #Stat.Err.Protect := true;
+	    END_IF;
+	ELSIF #instOM.LocalAct THEN
+	    IF (#LocalSetting = 1 OR #LocalSetting = 3) THEN
+	        #Stat.Err.Permit := NOT #Permit AND #Perm_en AND NOT #BypProt AND "SM_StateE"(state := #ST_STOP, inst := #Stat.State);
+	        #Stat.Err.Intlock := NOT #Intlock AND #Intl_en AND NOT #BypProt;
+	        IF NOT #Protect AND #Prot_en AND NOT #BypProt THEN
+	            #Stat.Err.Protect := true;
+	        END_IF;
+	    ELSIF (#LocalSetting = 2 OR #LocalSetting = 4 OR #LocalSetting = 5) THEN
+	        #Stat.Err.Permit := false;
+	        #Stat.Err.Intlock := false;
+	        #Stat.Err.Protect := false;
+	    END_IF;
+	ELSIF #instOM.OosAct THEN
+	    #Stat.Err.Permit := false;
+	    #Stat.Err.Intlock := false;
+	END_IF;
+	
+	REGION alarms
+	    #Stat.Err.Trip := NOT #Trip;
+	    
+	    // Trip
+	    IF NOT #Trip THEN
+	        ;
+	    END_IF;
+	    
+	    // FaultExt
+	    IF #FaultExt THEN
+	        #Stat.Err.FaultExt := true;
+	    END_IF;
+	    
+	    // CSF
+	    IF #CSF AND #instFeature.Bit[18] THEN
+	        #Stat.Err.CSF := true;
+	    END_IF;
+	    
+	    // MonStaErr
+	    #tbMonStaErrDiscrepancy := (#Monitor AND #FbkRun AND "SM_StateE"(state := #ST_STOP, inst := #Stat.State)) OR
+	    (#Monitor AND NOT #FbkRun AND "SM_StateE"(state := #ST_RUN, inst := #Stat.State));
+	    IF #tbMonStaErrDiscrepancy THEN
+	        #Stat.MonTiStaticAct := #Stat.MonTiStaticAct + #SampleTime;
+	        #CurrMon := #MonTiStatic - #Stat.MonTiStaticAct;
+	    ELSE
+	        #Stat.MonTiStaticAct := T#0ms;
+	    END_IF;
+	    IF #Stat.MonTiStaticAct >= #MonTiStatic THEN
+	        #Stat.Err.MonStaErr := true;
+	    END_IF;
+	    
+	    // GrpErr
+	    #Stat.Err.GrpErr := #Stat.Err.Trip OR #Stat.Err.MonDynErr OR #Stat.Err.MonDynStopErr OR #Stat.Err.MonStaErr
+	    OR #Stat.Err.Protect OR #Stat.Err.FaultExt OR #Stat.Err.CSF;
+	END_REGION
+	
+	REGION reset_errors
+	    IF #Stat.Err.Protect OR #Stat.Err.MonDynErr OR #Stat.Err.MonStaErr OR #Stat.Err.FaultExt OR #Stat.Err.Trip THEN
+	        #tempRst := false;
+	        IF #instOM.AutAct THEN
+	            // автоматический режим
+	            IF NOT #FeatureStruct.Bit9 AND NOT #FeatureStruct.Bit30 THEN
+	                #tempRst := #RstLi OR #RstOp;
+	            ELSIF #FeatureStruct.Bit9 AND NOT #FeatureStruct.Bit30 THEN
+	                #tempRst := #RstLi OR #RstOp OR (#StartAut AND NOT #Stat.Old.StartAut) OR (#StopAut AND NOT #Stat.Old.StopAut);
+	            ELSIF NOT #FeatureStruct.Bit9 AND #FeatureStruct.Bit30 THEN
+	                #tempRst := #RstLi;
+	            ELSIF #FeatureStruct.Bit9 AND #FeatureStruct.Bit30 THEN
+	                #tempRst := #RstLi OR (#StopAut AND NOT #Stat.Old.StartAut) OR (#StopAut AND NOT #Stat.Old.StopAut);
+	            END_IF;
+	        ELSIF #instOM.LocalAct THEN
+	            // местный режим
+	            IF #LocalSetting = 1 OR #LocalSetting = 3 THEN
+	                #tempRst := #StopLocal;
+	            ELSIF #LocalSetting = 2 OR #LocalSetting = 4 THEN
+	                #tempRst := true;
+	            END_IF;
+	        ELSIF #instOM.ManAct_OnAct THEN
+	            // ручной режим
+	            IF NOT #FeatureStruct.Bit30 AND NOT #FeatureStruct.Bit31 THEN
+	                #tempRst := true;
+	            ELSIF #FeatureStruct.Bit30 AND NOT #FeatureStruct.Bit31 THEN
+	                #tempRst := true;
+	            ELSIF NOT #FeatureStruct.Bit30 AND #FeatureStruct.Bit31 THEN
+	                #tempRst := #RstLi OR #RstOp;
+	            ELSIF #FeatureStruct.Bit30 AND #FeatureStruct.Bit31 THEN
+	                #tempRst := #RstOp;
+	            END_IF;
+	        ELSIF #instOM.OosAct THEN
+	            // вывод из эксплуатации
+	            #tempRst := true;
+	        END_IF;
+	        IF #tempRst THEN
+	            #Stat.Err.Trip := NOT #Trip;
+	            #Stat.Err.FaultExt := #FaultExt;
+	            #Stat.Err.MonDynErr := false;
+	            #Stat.Err.MonStaErr := #tbMonStaErrDiscrepancy;
+	            #Stat.Err.Protect := NOT #Protect OR NOT #Prot_en;
+	        END_IF;
+	    END_IF;
+	END_REGION
+	
+	// команда на запуск в зависимости от режима работы
+	IF #instOM.AutAct THEN
+	    // автоматический режим
+	    #Stat.Start := (#Stat.Start OR #StartAut) AND NOT #StopAut;
+	    IF #Stat.Err.Permit OR #Stat.Err.Intlock OR #Stat.Err.Protect THEN
+	        #Stat.Start := false;
+	    END_IF;
+	ELSIF #instOM.ManAct_OnAct THEN
+	    // ручной режим
+	    #Stat.Start := (#Stat.Start OR #StartMan) AND NOT #StopMan;
+	    IF #Stat.Err.Permit OR #Stat.Err.Intlock OR #Stat.Err.Protect THEN
+	        #Stat.Start := false;
+	    END_IF;
+	ELSIF #instOM.LocalAct THEN
+	    // местный режим
+	    IF #LocalSetting = 1 OR #LocalSetting = 3 THEN
+	        #Stat.Start := (#Stat.Start OR #StartLocal) AND NOT #StopLocal;
+	        IF (#Stat.Err.Permit OR #Stat.Err.Intlock OR #Stat.Err.Protect) AND NOT #BypProt THEN
+	            #Stat.Start := false;
+	        END_IF;
+	    ELSIF #LocalSetting = 2 OR #LocalSetting = 4 THEN
+	        #Stat.Start := #FbkRun;
+	    END_IF;
+	ELSIF #instOM.OosAct THEN
+	    // вывод из эксплуатации
+	    #Stat.Start := false;
+	END_IF;
+	
+	// принудительный останов
+	IF #StopForce THEN
+	    #Stat.Start := false;
+	END_IF;
+	
+	// останов по аварии
+	IF #Stat.Err.FaultExt OR #Stat.Err.CSF OR #Stat.Err.MonDynErr OR #Stat.Err.MonStaErr OR #Stat.Err.Trip THEN
+	    #Stat.Start := false;
+	END_IF;
+	
+	// состояние оборудования
+	CASE "SM_Case"(sampleTime := #SampleTime, inst := #Stat.State) OF
+	    #ST_STOP:
+	        IF #StartForce AND #instOM.AutAct THEN
+	            // принудительный запуск в автоматическом режиме
+	            "SM_NewState"(newState := #ST_FORCESTART,
+	                          inst := #Stat.State);
+	        ELSIF ((#instOM.AutAct OR #instOM.ManAct_OnAct) AND #Stat.Start)
+	            OR (#StartForce AND #instOM.ManAct_OnAct) THEN
+	            // предпусковая сигнализация в автоматическом, ручном режимах и принудительном запуске в ручном режиме
+	            "SM_NewState"(newState := #ST_PREWARN,
+	                          inst := #Stat.State);
+	        ELSIF #instOM.LocalAct AND (#LocalSetting = 1 OR #LocalSetting = 3) AND #Stat.Start THEN
+	            // запуск в местном режиме с управляющими командами
+	            "SM_NewState"(newState := #ST_STARTING,
+	                          inst := #Stat.State);
+	        ELSIF #instOM.LocalAct AND (#LocalSetting = 2 OR #LocalSetting = 4) AND #FbkRun THEN
+	            // запуск в местном режиме без управляющих команд
+	            "SM_NewState"(newState := #ST_RUN,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	    #ST_PREWARN:
+	        IF #StartForce AND "SM_TimeGE"(value := #WarnTiMan, inst := #Stat.State) THEN
+	            // принудительный запуск
+	            "SM_NewState"(newState := #ST_FORCESTART,
+	                          inst := #Stat.State);
+	        ELSIF (#instOM.AutAct AND "SM_TimeGE"(value := #WarnTiAut, inst := #Stat.State)) OR
+	            (#instOM.ManAct_OnAct AND "SM_TimeGE"(value := #WarnTiMan, inst := #Stat.State)) OR
+	            #instOM.LocalAct THEN
+	            // начало запуска
+	            "SM_NewState"(newState := #ST_STARTING,
+	                          inst := #Stat.State);
+	        ELSIF NOT #Stat.Start THEN
+	            // останов
+	            "SM_NewState"(newState := #ST_STOPPING,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	    #ST_STARTING:
+	        IF #StartForce AND (#instOM.AutAct OR #instOM.ManAct_OnAct) THEN
+	            // принудительный запуск
+	            "SM_NewState"(newState := #ST_FORCESTART,
+	                          inst := #Stat.State);
+	        ELSIF NOT #Monitor OR (#Monitor AND #FbkRun) THEN
+	            // есть обратная связь
+	            "SM_NewState"(newState := #ST_RUN,
+	                          inst := #Stat.State);
+	        ELSIF NOT #Stat.Start THEN
+	            // останов
+	            "SM_NewState"(newState := #ST_STOPPING,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	        IF #Monitor AND "SM_TimeGE"(value := #MonTiDynamic, inst := #Stat.State) THEN
+	            // авария по обратной связи
+	            #Stat.Err.MonDynErr := true;
+	        END_IF;
+	        
+	        #CurrMon := #MonTiDynamic - "SM_GetStateTime"(#Stat.State);
+	        
+	    #ST_RUN:
+	        IF #StartForce AND (#instOM.AutAct OR #instOM.ManAct_OnAct) THEN
+	            // принудительный запуск
+	            "SM_NewState"(newState := #ST_FORCESTART,
+	                          inst := #Stat.State);
+	        ELSIF #instOM.LocalAct AND (#LocalSetting = 2 OR #LocalSetting = 4) AND NOT #FbkRun THEN
+	            // останов в ручном режиме без управляющих команд
+	            "SM_NewState"(newState := #ST_STOP,
+	                          inst := #Stat.State);
+	        ELSIF NOT #Stat.Start THEN
+	            // останов
+	            "SM_NewState"(newState := #ST_STOPPING,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	    #ST_STOPPING:
+	        IF #StartForce AND (#instOM.AutAct OR #instOM.ManAct_OnAct) THEN
+	            // принудительный запуск
+	            "SM_NewState"(newState := #ST_FORCESTART,
+	                          inst := #Stat.State);
+	        ELSIF NOT #Monitor OR (#Monitor AND NOT #FbkRun) THEN
+	            // нет обратной связи
+	            "SM_NewState"(newState := #ST_IDLE,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	        IF #Monitor AND "SM_TimeGE"(value := #MonTiDynamic, inst := #Stat.State) THEN
+	            // авария по обратной связи
+	            #Stat.Err.MonDynErr := true;
+	        END_IF;
+	        
+	        #CurrMon := #MonTiDynamic - "SM_GetStateTime"(#Stat.State);
+	        
+	    #ST_IDLE:
+	        IF "SM_TimeGE"(value := #IdleTime, inst := #Stat.State) THEN
+	            "SM_NewState"(newState := #ST_STOP,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	    #ST_FORCESTART:
+	        IF NOT #StartForce OR NOT (#instOM.AutAct OR #instOM.ManAct_OnAct) THEN
+	            "SM_NewState"(newState := #ST_RUN,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	    ELSE
+	        "SM_NewState"(newState := #ST_STOP,
+	                      inst := #Stat.State);
+	        
+	END_CASE;
+	
+	// запись выходов
+	#MonDynErr := #Stat.Err.MonDynErr;
+	#MonDynStopErr := #Stat.Err.MonDynStopErr;
+	#MonStaErr := #Stat.Err.MonStaErr;
+	#R_StpAct := false;
+	#LockAct := #Stat.Err.Permit OR #Stat.Err.Intlock OR #Stat.Err.Protect OR #Stat.Err.Trip;
+	#GrpErr := #Stat.Err.MonDynErr OR #Stat.Err.MonDynStopErr OR #Stat.Err.MonStaErr OR #CSF OR #FaultExt OR NOT #Trip;
+	#RdyToStart := NOT (#Stat.Err.MonDynErr OR #Stat.Err.MonDynStopErr OR #Stat.Err.MonStaErr OR (#CSF AND #instFeature.Bit[18]) OR #FaultExt OR NOT #Trip)
+	AND "SM_StateE"(state := #ST_STOP, inst := #Stat.State) AND #instOM.AutAct AND NOT #StopForce AND NOT #LockAct AND NOT #R_StpAct;
+	#WarnAct := "SM_StateE"(state := #ST_PREWARN, inst := #Stat.State);
+	#tempStart := "SM_StateE"(state := #ST_STARTING, inst := #Stat.State)
+	OR "SM_StateE"(state := #ST_RUN, inst := #Stat.State)
+	OR "SM_StateE"(state := #ST_FORCESTART, inst := #Stat.State);
+	#Start := #tempStart;
+	IF #tempStart AND NOT #Stat.Old.Start THEN
+	    #Stat.P_Start_Act := #PulseWidth;
+	ELSIF NOT #tempStart AND #Stat.Old.Start THEN
+	    #Stat.P_Stop_Act := #PulseWidth;
+	END_IF;
+	#P_Start := #Stat.P_Start_Act > T#0ms AND #tempStart;
+	#P_Stop := NOT (#Stat.P_Stop_Act > T#0ms AND NOT #tempStart);
+	#FbkRunOut := #FbkRun;
+	#Run := "SM_StateE"(state := #ST_RUN, inst := #Stat.State);
+	#Stop := "SM_StateE"(state := #ST_STOP, inst := #Stat.State) OR "SM_StateE"(state := #ST_IDLE, inst := #Stat.State);
+	
+	// Status1
+	FOR #i := 0 TO 31 DO
+	    #tempStatus1At[#i] := false;
+	END_FOR;
+	#tempStatus1At[19] := #Stat.Err.Trip;
+	#Status1 := #tempStatus1;
+	
+	// сбрасываем команды из HMI
+	#StartMan := false;
+	#StopMan := false;
+	#RstOp := false;
+	
+	
+	// для следующего цикла
+	#Stat.Old.StartAut := #StartAut;
+	#Stat.Old.StopAut := #StopAut;
+	#Stat.Old.Start := #tempStart;
+	IF #Stat.P_Start_Act > T#0ms THEN
+	    #Stat.P_Start_Act := #Stat.P_Start_Act - #SampleTime;
+	END_IF;
+	IF #Stat.P_Stop_Act > T#0ms THEN
+	    #Stat.P_Stop_Act := #Stat.P_Stop_Act - #SampleTime;
+	END_IF;
+	
+	
+	// аварии
+	#msgTrip(signal := NOT #Trip,
+	         msgWithAck := false,
+	         msgRank := 1);
+	#Msgs := "MsgCollect"(maxIndex := 0,
+	                      msg0 := #msgTrip.msg,
+	                      msg1 := "MsgConst".nullMsg,
+	                      msg2 := "MsgConst".nullMsg,
+	                      msg3 := "MsgConst".nullMsg,
+	                      msg4 := "MsgConst".nullMsg,
+	                      msg5 := "MsgConst".nullMsg,
+	                      msg6 := "MsgConst".nullMsg,
+	                      msg7 := "MsgConst".nullMsg,
+	                      msg8 := "MsgConst".nullMsg,
+	                      msg9 := "MsgConst".nullMsg,
+	                      msg10 := "MsgConst".nullMsg,
+	                      msg11 := "MsgConst".nullMsg,
+	                      msg12 := "MsgConst".nullMsg,
+	                      msg13 := "MsgConst".nullMsg,
+	                      msg14 := "MsgConst".nullMsg,
+	                      msg15 := "MsgConst".nullMsg);
+END_FUNCTION_BLOCK
+

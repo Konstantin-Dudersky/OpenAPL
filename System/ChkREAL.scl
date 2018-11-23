@@ -1,0 +1,47 @@
+﻿FUNCTION "ChkREAL" : Real
+TITLE = Check infinite values
+{ S7_Optimized_Access := 'FALSE' }
+FAMILY : System
+VERSION : 0.1
+   VAR_INPUT 
+      In : Real;   // The real value to be checked
+   END_VAR
+
+   VAR_OUTPUT 
+      ErrNum : Int;   // Error number: 0=no error; 1=infinity; 2=denormal; 3=NaN
+   END_VAR
+
+   VAR_TEMP 
+      theREAL : Real;
+      theREAL_dw AT theREAL : DWord;
+      exponent : DWord;   // Bit 23-30
+      fraction_1 : DWord;   // Bit 22, most significant bit
+      fraction_2 : DWord;   // Bit 0 - 21
+   END_VAR
+
+
+BEGIN
+	#ErrNum := 0;
+	#theREAL := #In;
+	#exponent := #theREAL_dw AND DW#16#7F800000;
+	#fraction_1 := #theREAL_dw AND DW#16#400000;
+	#fraction_2 := #theREAL_dw AND DW#16#3FFFFF;
+	#ChkREAL := #theREAL;
+	
+	IF #exponent = DW#16#7F800000 THEN
+	    IF (#fraction_1 <> DW#16#0) OR ((#fraction_1 = DW#16#0) AND (#fraction_2 <> DW#16#0)) THEN
+	        #ErrNum := 3;              //3=NaN
+	    ELSIF (#fraction_1 = DW#16#0) AND (#fraction_2 = DW#16#0) THEN
+	        #ErrNum := 1;          //1=infinity
+	        IF #theREAL > 0.000000e+000 THEN
+	            #ChkREAL := 3.402822e+038;
+	        ELSE
+	            #ChkREAL := -3.402822e+038;
+	        END_IF;
+	    END_IF;
+	ELSIF (#exponent = DW#16#0) AND ((#fraction_1 <> DW#16#0) OR (#fraction_2 <> DW#16#0)) THEN
+	    #ErrNum := 2;              //2=denormal
+	    #ChkREAL := 0.000000e+000;
+	END_IF;
+END_FUNCTION
+

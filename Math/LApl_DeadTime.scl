@@ -1,0 +1,69 @@
+﻿FUNCTION_BLOCK "LApl_DeadTime"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      DeadTime : Time := T#1s;   // Time by which the analog input value is delayed
+      In : "LApl_AnaVal";   // Analog input value
+      SampleTime : Time := T#100ms;   // Sampling time
+   END_VAR
+
+   VAR_OUTPUT 
+      DeadT_Cyc : Int;   // Number of cycles by which the analog value is delayed
+      Out : "LApl_AnaVal";   // Analog output value
+   END_VAR
+
+   VAR 
+      stat : Struct
+         values : Array[0..#MAX_INDEX] of "LApl_AnaVal";
+         actIndex : DInt;
+         actValuesInPlace : DInt;
+         numValues : DInt;
+         maxValuesInPlace : DInt;
+         maxIndex : DInt;
+      END_STRUCT;
+   END_VAR
+
+   VAR CONSTANT 
+      MAX_INDEX : Int := 99;
+   END_VAR
+
+
+BEGIN
+	// рассчет границ
+	#stat.numValues := CEIL(DINT_TO_REAL(#DeadTime) / DINT_TO_REAL(#SampleTime));
+	#stat.maxValuesInPlace := CEIL(DINT_TO_REAL(#stat.numValues) / (#MAX_INDEX + 1));
+	#stat.maxIndex := CEIL(DINT_TO_REAL(#stat.numValues) / DINT_TO_REAL(#stat.maxValuesInPlace)) - 1;
+	
+	// проверка на выход из диапазона
+	#stat.actIndex := LIMIT_DINT(MN := 0, IN := #stat.actIndex, MX := #stat.maxIndex);
+	#stat.actValuesInPlace := LIMIT_DINT(MN := 0, IN := #stat.actValuesInPlace, MX := #stat.maxValuesInPlace);
+	
+	// запись выхода
+	IF #stat.actIndex >= #stat.maxIndex THEN
+	    #Out := #stat.values[0];
+	ELSE
+	    #Out := #stat.values[#stat.actIndex + 1];
+	END_IF;
+	
+	// контроль заполнения одной ячейки
+	IF #stat.actValuesInPlace = 0 THEN
+	    // в текущей ячейке нет значений
+	    #stat.values[#stat.actIndex] := #In;
+	ELSE
+	    // в текущей ячейке уже есть значение
+	    #stat.values[#stat.actIndex].Value := #stat.values[#stat.actIndex].Value + #In.Value;
+	END_IF;
+	#stat.actValuesInPlace := #stat.actValuesInPlace + 1;
+	
+	IF #stat.actValuesInPlace >= #stat.maxValuesInPlace THEN
+	    // кол-во значений в одной ячейке превысило максимум
+	    #stat.values[#stat.actIndex].Value := #stat.values[#stat.actIndex].Value / DINT_TO_REAL(#stat.actValuesInPlace);
+	    IF #stat.actIndex >= #stat.maxIndex THEN
+	        #stat.actIndex := 0;
+	    ELSE
+	        #stat.actIndex := #stat.actIndex + 1;
+	    END_IF;
+	    #stat.actValuesInPlace := 0;
+	END_IF;
+END_FUNCTION_BLOCK
+

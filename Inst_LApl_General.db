@@ -1,0 +1,9 @@
+﻿DATA_BLOCK "Inst_LApl_General"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+"LApl_General"
+
+BEGIN
+
+END_DATA_BLOCK
+

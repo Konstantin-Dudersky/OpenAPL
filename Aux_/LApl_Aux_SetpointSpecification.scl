@@ -1,0 +1,86 @@
+﻿FUNCTION_BLOCK "LApl_Aux_SetpointSpecification"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      SP_LiOp : Bool;
+      SP_IntLi : Bool;
+      SP_ExtLi : Bool;
+      SP_Ext : Real;
+      SP_TrkExt : Bool;
+      SP_HiLim : Real;
+      SP_LoLim : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      SP : Real;
+      SP_HiAct : Bool;
+      SP_LoAct : Bool;
+   END_VAR
+
+   VAR_IN_OUT 
+      SP_IntOp : Bool;
+      SP_ExtOp : Bool;
+      SP_Int : Real;
+   END_VAR
+
+   VAR 
+      Stat : Struct
+         State : "typeSM";
+      END_STRUCT;
+   END_VAR
+
+   VAR CONSTANT 
+      ST_INTRENAL : Int;
+      ST_EXTERNAL : Int := 1;
+   END_VAR
+
+
+BEGIN
+	CASE "SM_Case"(sampleTime := T#0ms, inst := #Stat.State) OF
+	    #ST_INTRENAL:
+	        IF (NOT #SP_LiOp AND #SP_ExtOp) OR (#SP_LiOp AND #SP_ExtLi AND NOT #SP_IntLi) THEN
+	            "SM_NewState"(newState := #ST_EXTERNAL,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	        #SP_Int := LIMIT_REAL(MN := #SP_LoLim, IN := #SP_Int, MX := #SP_HiLim);
+	        #SP := #SP_Int;
+	        
+	    #ST_EXTERNAL:
+	        IF (NOT #SP_LiOp AND #SP_IntOp) OR (#SP_LiOp AND #SP_IntLi) THEN
+	            "SM_NewState"(newState := #ST_INTRENAL,
+	                          inst := #Stat.State);
+	        END_IF;
+	        
+	        #SP := #SP_Ext;
+	        IF #SP_TrkExt THEN
+	            #SP_Int := #SP_Ext;
+	        END_IF;
+	        
+	    ELSE
+	        "SM_NewState"(newState := #ST_INTRENAL,
+	                      inst := #Stat.State);
+	
+	END_CASE;
+	
+	// верхнее ограничение задания
+	IF #SP >= #SP_HiLim THEN
+	    #SP := #SP_HiLim;
+	    #SP_HiAct := true;
+	ELSE
+	    #SP_HiAct := false;
+	END_IF;
+	
+	// нижнее ограничение задания
+	IF #SP <= #SP_LoLim THEN
+	    #SP := #SP_LoLim;
+	    #SP_LoAct := true;
+	ELSE
+	    #SP_LoAct := false;
+	END_IF;
+	
+	// сброс команд от hmi
+	#SP_IntOp := false;
+	#SP_ExtOp := false;
+END_FUNCTION_BLOCK
+

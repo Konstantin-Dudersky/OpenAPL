@@ -1,0 +1,44 @@
+﻿FUNCTION "LApl_STIn" : Void
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      In : Byte;   // Signal status
+   END_VAR
+
+   VAR_OUTPUT 
+      ST_60 : Bool;   // 1 = Manipulated value (for example, substitute value, simulation, last valid value)
+      ST_00 : Bool;   // 1 = Bad, device related
+      ST_28 : Bool;   // 1 = Bad, process related
+      ST_68 : Bool;   // 1 = Unknown, device related
+      ST_78 : Bool;   // 1 = Unknown, process related
+      ST_A4 : Bool;   // 1 = Maintenance request
+      ST_80 : Bool;   // 1 = Good
+   END_VAR
+
+
+BEGIN
+	#ST_60 := 16#00;
+	#ST_00 := 16#00;
+	#ST_28 := 16#00;
+	#ST_68 := 16#00;
+	#ST_78 := 16#00;
+	#ST_A4 := 16#00;
+	#ST_80 := 16#00;
+	
+	IF #In = 16#60 THEN
+	    #ST_60 := true;
+	ELSIF #In = 16#00 THEN
+	    #ST_00 := true;
+	ELSIF #In = 16#28 THEN
+	    #ST_28 := true;
+	ELSIF #In = 16#68 THEN
+	    #ST_68 := true;
+	ELSIF #In = 16#78 THEN
+	    #ST_78 := true;
+	ELSIF #In = 16#A4 THEN
+	    #ST_A4 := true;
+	ELSIF #In = 16#80 THEN
+	    #ST_80 := true;
+	END_IF;
+END_FUNCTION
+

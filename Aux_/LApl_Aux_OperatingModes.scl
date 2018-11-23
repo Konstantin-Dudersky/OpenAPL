@@ -1,0 +1,193 @@
+﻿FUNCTION_BLOCK "LApl_Aux_OperatingModes"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      AdvCoEn : Bool;
+      AdvCoModSP : Real;
+      AdvCoMstrOn : Bool;
+      AdvCoOn : Bool;
+      AutModLi : Bool;
+      Feature : DWord;
+      FeatureAt { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} AT Feature : Array[0..31] of Bool;
+      LocalLi : Bool;
+      LocalSetting : Int := 1;
+      ManModLi : Bool;
+      ModLiOp : Bool;
+      OosLi : Bool;
+   END_VAR
+
+   VAR_OUTPUT 
+      AutAct : Bool;
+      LocalAct : Bool;
+      ManAct_OnAct : Bool;
+      OosAct : Bool;
+      mode : Int;
+   END_VAR
+
+   VAR_IN_OUT 
+      AutModOp : Bool;
+      LocalOp : Bool;
+      ManModOp_OnOp : Bool;
+      OosOp : Bool;
+   END_VAR
+
+   VAR 
+      stat : Struct
+         state : "typeSM";
+         modBeforeLocal : Int;
+         modBeforeProgram : Int;
+      END_STRUCT;
+   END_VAR
+
+   VAR CONSTANT 
+      ST_AUT : Int;
+      ST_MAN_ON : Int := 1;
+      ST_LOCAL : Int := 2;
+      ST_OOS : Int := 3;
+      ST_PROGRAM : Int := 4;
+   END_VAR
+
+
+BEGIN
+	(*
+	Библиотека: LApl
+	Тестировано:
+	    CPU 315-2 PN/DP, Fw V3.2
+	Разработано: TIA Portal v14
+	Ограничения: вызов в любых OB
+	Требования:
+	    S7-300 - загрузочная память - 1920 байт, рабочая память - 1742 байта
+	Функциональность:
+	    Переключение рабочих режимов для работы блоков APL
+	------------------------------------------------------------------------------------------------------------------------
+	Версии:
+	00.00.01 2016-06-30 (Константин Дудерский)
+	    Первая версия
+	------------------------------------------------------------------------------------------------------------------------
+	Выходы:
+	mode - режим работы:
+	    0 = автоматический
+	    1 = ручной
+	    2 = местный
+	    3 = вывод из эксплуатации
+	    4 = программный
+	*)
+	
+	CASE "SM_Case"(sampleTime := T#0ms, inst := #stat.state) OF
+	    #ST_AUT:
+	        // автоматический режим
+	        IF
+	            // to man
+	            (NOT #ModLiOp AND #ManModOp_OnOp) OR
+	            (#ModLiOp AND #ManModLi AND NOT #FeatureAt[4]) OR
+	            (#ModLiOp AND NOT #AutModLi AND #FeatureAt[4])
+	        THEN
+	            "SM_NewState"(newState := #ST_MAN_ON,
+	                          inst := #stat.state);
+	        ELSIF
+	            // to local 
+	            (NOT #ModLiOp AND #LocalOp AND (#LocalSetting = 3 OR #LocalSetting = 4)) OR
+	            (#LocalLi AND (#LocalSetting = 1 OR #LocalSetting = 2 OR #LocalSetting = 5))
+	        THEN
+	            "SM_NewState"(newState := #ST_LOCAL,
+	                          inst := #stat.state);
+	            #stat.modBeforeLocal := #ST_AUT;
+	        ELSIF
+	            // to program
+	            (NOT #ModLiOp AND #AdvCoEn AND #AdvCoOn) OR
+	            (#AdvCoEn AND #AdvCoMstrOn)
+	        THEN
+	            "SM_NewState"(newState := #ST_PROGRAM,
+	                          inst := #stat.state);
+	            #stat.modBeforeProgram := #ST_AUT;
+	        END_IF;
+	        
+	    #ST_MAN_ON:
+	        // ручной режим
+	        IF
+	            // to aut
+	            (NOT #ModLiOp AND #AutModOp) OR
+	            (#ModLiOp AND #AutModLi)
+	        THEN
+	            "SM_NewState"(newState := #ST_AUT,
+	                          inst := #stat.state);
+	        ELSIF
+	            // to local  
+	            (NOT #ModLiOp AND #LocalOp AND (#LocalSetting = 3 OR #LocalSetting = 4)) OR
+	            (#LocalLi AND (#LocalSetting = 1 OR #LocalSetting = 2 OR #LocalSetting = 5))
+	        THEN
+	            "SM_NewState"(newState := #ST_LOCAL,
+	                          inst := #stat.state);
+	            #stat.modBeforeLocal := #ST_MAN_ON;
+	        ELSIF (#AdvCoEn AND #AdvCoModSP = 0) AND ((#AdvCoOn AND NOT #ModLiOp) OR #AdvCoMstrOn) THEN
+	            // to program
+	            "SM_NewState"(newState := #ST_PROGRAM,
+	                          inst := #stat.state);
+	            #stat.modBeforeProgram := #ST_MAN_ON;
+	        ELSIF
+	            // to oos
+	            (NOT #ModLiOp AND #OosOp) OR
+	            (#OosLi AND #FeatureAt[1])
+	        THEN
+	            "SM_NewState"(newState := #ST_OOS,
+	                          inst := #stat.state);
+	        END_IF;
+	        
+	    #ST_LOCAL:
+	        // местный режим
+	        IF NOT #ModLiOp AND #AutModOp AND (#LocalSetting = 0 OR #LocalSetting = 3 OR #LocalSetting = 4) THEN
+	            // to aut
+	            "SM_NewState"(newState := #ST_AUT,
+	                          inst := #stat.state);
+	        ELSIF NOT #ModLiOp AND #ManModOp_OnOp AND (#LocalSetting = 0 OR #LocalSetting = 3 OR #LocalSetting = 4) THEN
+	            // to man
+	            "SM_NewState"(newState := #ST_MAN_ON,
+	                          inst := #stat.state);
+	        ELSIF NOT #LocalLi AND (#LocalSetting = 0 OR #LocalSetting = 1 OR #LocalSetting = 2 OR #LocalSetting = 5) THEN
+	            // from local
+	            IF #FeatureAt[10] THEN
+	                "SM_NewState"(newState := #ST_MAN_ON,
+	                              inst := #stat.state);
+	            ELSE
+	                "SM_NewState"(newState := #stat.modBeforeLocal,
+	                              inst := #stat.state);
+	            END_IF;
+	        END_IF;
+	        
+	    #ST_OOS:
+	        // вывод из эксплуатации
+	        IF #ManModOp_OnOp THEN
+	            "SM_NewState"(newState := #ST_MAN_ON,
+	                          inst := #stat.state);
+	        END_IF;
+	        
+	    #ST_PROGRAM:
+	        // программный режим
+	        IF (NOT #ModLiOp AND #AutModOp) OR (#ModLiOp AND #AutModLi) OR (NOT #AdvCoMstrOn AND #stat.modBeforeProgram = #ST_AUT) THEN
+	            "SM_NewState"(newState := #ST_AUT,
+	                          inst := #stat.state);
+	        ELSIF (NOT #ModLiOp AND #ManModOp_OnOp) OR (NOT #AdvCoMstrOn AND #stat.modBeforeProgram = #ST_MAN_ON) THEN
+	            "SM_NewState"(newState := #ST_MAN_ON,
+	                          inst := #stat.state);
+	        END_IF;
+	        
+	    ELSE
+	        "SM_NewState"(newState := #ST_AUT,
+	                      inst := #stat.state);
+	        
+	END_CASE;
+	
+	// запись выходов
+	#AutAct := "SM_StateE"(state := #ST_AUT, inst := #stat.state);
+	#LocalAct := "SM_StateE"(state := #ST_LOCAL, inst := #stat.state);
+	#ManAct_OnAct := "SM_StateE"(state := #ST_MAN_ON, inst := #stat.state);
+	#OosAct := "SM_StateE"(state := #ST_OOS, inst := #stat.state);
+	#mode := "SM_GetState"(#stat.state);
+	
+	// сброс команд оператора
+	#AutModOp := false;
+	#LocalOp := false;
+	#ManModOp_OnOp := false;
+	#OosOp := false;
+END_FUNCTION_BLOCK
+

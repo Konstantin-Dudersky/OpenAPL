@@ -1,0 +1,12 @@
+﻿FUNCTION "LApl_StruAnOuGood" : "LApl_AnaVal"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      Value : Real;
+   END_VAR
+
+
+BEGIN
+	#LApl_StruAnOuGood := "LApl_StruAnOu"(Value := #Value, ST := 16#80);
+END_FUNCTION
+

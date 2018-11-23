@@ -1,0 +1,86 @@
+﻿FUNCTION_BLOCK "LApl_Lag"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      Hold : Bool;   // 1 = Hold calculation
+      In : "LApl_AnaVal";   // Analog input value
+      LagTime : Time := T#1s;   // Delay time
+      Reset : Bool;   // 1 = Reset Out output to the value of the In input
+      SampleTime : Time := T#100ms;   // Sampling time
+   END_VAR
+
+   VAR_OUTPUT 
+      Out : "LApl_AnaVal";   // Delayed value output
+   END_VAR
+
+   VAR 
+      stat : Struct
+         old : Struct
+            Reset : Bool;
+         END_STRUCT;
+      END_STRUCT;
+   END_VAR
+
+   VAR_TEMP 
+      temp : Struct
+         Err : Int;
+      END_STRUCT;
+   END_VAR
+
+
+BEGIN
+	REGION description
+	(*
+	1. Описание LApl_Lag
+	
+	---------
+	Object name (type + number) and family
+	
+	Type + number: FB 1828
+	Family: Math
+	
+	---------
+	Area of application for Lag
+	
+	The block is used for the following application:
+	- Smoothing the Input value (low-pass filter)
+	
+	---------
+	How it works
+	
+	The block smoothes the input variable (In input) using a 1. order time delay. This delay time 
+	can be configured (LagTime connection). The block works according to the following formula:
+	
+	Out = In + (Out_prev - In) * e ^ (-SampleTime / LagTime)
+	
+	Where:
+	- Out = Output value
+	- LagTime = Delay time
+	- SampleTime = Sampling time
+	- In = Input value
+	
+	The formula only applies to LagTime > 0. If LagTime = 0, the input is passed directly to the 
+	output. If the input value is outside the REAL range limits, the calculation is stopped. If the 
+	input value is outside the range limits again, the calculation is resumed automatically.
+	*)
+	END_REGION
+	
+	// проверка действительного числа
+	#In.Value := "ChkREAL"(In := #In.Value, ErrNum => #temp.Err);
+	
+	IF NOT #Hold AND #LagTime > T#0ms AND #temp.Err <> 3 THEN
+	    #Out.ST := #In.ST;
+	    #Out.Value := #In.Value + (#Out.Value - #In.Value) * EXP(-1 * DINT_TO_REAL(#SampleTime) / DINT_TO_REAL(#LagTime));
+	ELSIF #LagTime = T#0ms THEN
+	    #Out := #In;
+	END_IF;
+	
+	// сброс
+	IF #Reset AND NOT #stat.old.Reset THEN
+	    #Out := #In;
+	END_IF;
+	
+	// для следующего цикла
+	#stat.old.Reset := #Reset;
+END_FUNCTION_BLOCK
+

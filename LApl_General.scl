@@ -1,0 +1,61 @@
+﻿FUNCTION_BLOCK "LApl_General"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      OB_Number : Int := 35;
+      OB3x_SampleTime : Time := T#100ms;
+      CurrentTime : "typeDTStruct";
+      PLC_type : Int := 1200;
+   END_VAR
+
+   VAR_OUTPUT 
+      FirstScan : Bool;
+   END_VAR
+
+   VAR 
+      stat : Struct
+         FirstScan_Delay : Time;
+      END_STRUCT;
+   END_VAR
+
+   VAR CONSTANT 
+      FIRSTSCAN_DURATION : Time := T#1s;
+   END_VAR
+
+
+BEGIN
+	(*
+	Блок для обработки общих данных для других блоков LApl
+	Нужно вызывать в двух OB:
+	    в OB100 (первый цикл контроллера)
+	    в OB3x - циклическое прерывание с интервалом OB3x_SampleTime
+	Во всех OB блок вызывается с одинаковым instance DB - Inst_LApl_General.
+	
+	//--------------------------------------------------------------------------------------------------
+	Входы:
+	
+	OB_number - номер OB, в котором вызывается блок
+	
+	OB3x_SampleTime - периодичность вызова блока, если блок вызывается в OB3x.
+	При вызове в OB100 значение не учитывается
+	
+	CurrentTime - текущее время контроллера в формате typeDTStruct
+	
+	PLC_type - тип используемого контроллера (возможно, понадобится в будущем)
+	
+	//--------------------------------------------------------------------------------------------------
+	Выходы:
+	
+	FirstScan - устанавливается в TRUE при перезагрузке контроллера на время, заданное 
+	в константе FIRSTSCAN_DURATION. После истечения времени устанавливается в FALSE.
+	*)
+	
+	IF #OB_Number = 100 THEN
+	    #stat.FirstScan_Delay := T#0ms;
+	ELSIF (#stat.FirstScan_Delay < #FIRSTSCAN_DURATION) AND (#OB_Number >= 30) AND (#OB_Number <= 39) THEN
+	    #stat.FirstScan_Delay := #stat.FirstScan_Delay + #OB3x_SampleTime;
+	END_IF;
+	
+	#FirstScan := (#stat.FirstScan_Delay < #FIRSTSCAN_DURATION);
+END_FUNCTION_BLOCK
+

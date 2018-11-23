@@ -1,0 +1,17 @@
+﻿FUNCTION "LApl_StruAnOu" : "LApl_AnaVal"
+{ S7_Optimized_Access := 'FALSE' }
+AUTHOR : dooder
+VERSION : 0.1
+//Merging a variable of the REAL data type and a signal status into an analog process value.
+//
+   VAR_INPUT 
+      Value : Real;   // Analog value
+      ST : Byte;   // Signal status
+   END_VAR
+
+
+BEGIN
+	#LApl_StruAnOu.Value := #Value;
+	#LApl_StruAnOu.ST := #ST;
+END_FUNCTION
+

@@ -1,0 +1,38 @@
+﻿FUNCTION "LApl_STOu" : Void
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      ST_60 : Bool;
+      ST_00 : Bool;
+      ST_28 : Bool;
+      ST_68 : Bool;
+      ST_78 : Bool;
+      ST_A4 : Bool;
+      ST_80 : Bool;
+   END_VAR
+
+   VAR_OUTPUT 
+      Out : Byte;
+   END_VAR
+
+
+BEGIN
+	IF #ST_60 THEN
+	    #Out := 16#60;
+	ELSIF #ST_00 THEN
+	    #Out := 16#00;
+	ELSIF #ST_28 THEN
+	    #Out := 16#28;
+	ELSIF #ST_68 THEN
+	    #Out := 16#68;
+	ELSIF #ST_78 THEN
+	    #Out := 16#78;
+	ELSIF #ST_A4 THEN
+	    #Out := 16#A4;
+	ELSIF #ST_80 THEN
+	    #Out := 16#80;
+	ELSE
+	    #Out := 16#00;
+	END_IF;
+END_FUNCTION
+

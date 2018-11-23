@@ -1,0 +1,173 @@
+﻿FUNCTION_BLOCK "LApl_Polygon"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT 
+      Cascaded : Bool;   // 1 = Block is cascaded
+      CasIn : Struct   // Input for cascade, to be interconnected with the output parameter CasOut of the precending polygon block
+         In : "LApl_AnaVal";
+         Out : "LApl_AnaVal";
+         In16 : Real;
+         Out16 : Real;
+      END_STRUCT;
+      In : "LApl_AnaVal";   // Analog input value
+      In1 : Real;   // Interpolation point In1
+      In2 : Real;   // Interpolation point In2
+      In3 : Real;   // Interpolation point In3
+      In4 : Real;   // Interpolation point In4
+      In5 : Real;   // Interpolation point In5
+      In6 : Real;   // Interpolation point In6
+      In7 : Real;   // Interpolation point In7
+      In8 : Real;   // Interpolation point In8
+      In9 : Real;   // Interpolation point In9
+      In10 : Real;   // Interpolation point In10
+      In11 : Real;   // Interpolation point In11
+      In12 : Real;   // Interpolation point In12
+      In13 : Real;   // Interpolation point In13
+      In14 : Real;   // Interpolation point In14
+      In15 : Real;   // Interpolation point In15
+      In16 : Real;   // Interpolation point In16
+      Num : Int := 16;   // Number of interpolation points
+      Out1 : Real;   // Sampling point 1
+      Out2 : Real;   // Sampling point 2
+      Out3 : Real;   // Sampling point 3
+      Out4 : Real;   // Sampling point 4
+      Out5 : Real;   // Sampling point 5
+      Out6 : Real;   // Sampling point 6
+      Out7 : Real;   // Sampling point 7
+      Out8 : Real;   // Sampling point 8
+      Out9 : Real;   // Sampling point 9
+      Out10 : Real;   // Sampling point 10
+      Out11 : Real;   // Sampling point 11
+      Out12 : Real;   // Sampling point 12
+      Out13 : Real;   // Sampling point 13
+      Out14 : Real;   // Sampling point 14
+      Out15 : Real;   // Sampling point 15
+      Out16 : Real;   // Sampling point 16
+      SubV_In : Real;   // Substitute value
+   END_VAR
+
+   VAR_OUTPUT 
+      CasOut : Struct   // Output parameter for cascade formation, to be interconnected with the input parameter CasIn of the following polygon block
+         In : "LApl_AnaVal";
+         Out : "LApl_AnaVal";
+         In16 : Real;
+         Out16 : Real;
+      END_STRUCT;
+      ErrorNum : Int;
+      Out : "LApl_AnaVal";   // Output value
+   END_VAR
+
+   VAR_TEMP 
+      In_low : Real;
+      In_high : Real;
+      Out_low : Real;
+      Out_high : Real;
+   END_VAR
+
+
+BEGIN
+	IF #Cascaded THEN
+	    #In := #CasIn.In;
+	    IF #In.Value < #CasIn.In16 THEN
+	        #Out := #CasIn.Out;
+	    ELSIF #In.Value >= #CasIn.In16 AND #In.Value < #In1 THEN
+	        #In_low := #CasIn.In16;
+	        #In_high := #In1;
+	        #Out_low := #CasIn.Out16;
+	        #Out_high := #Out1;
+	    END_IF;
+	ELSE
+	    IF #In.Value < #In1 THEN
+	        #In_low := #In1;
+	        #In_high := #In2;
+	        #Out_low := #Out1;
+	        #Out_high := #Out2;
+	    END_IF;
+	END_IF;
+	
+	
+	IF #In.Value >= #In1 AND #In.Value < #In2 THEN
+	    #In_low := #In1;
+	    #In_high := #In2;
+	    #Out_low := #Out1;
+	    #Out_high := #Out2;
+	ELSIF #In.Value >= #In2 AND #In.Value < #In3 THEN
+	    #In_low := #In2;
+	    #In_high := #In3;
+	    #Out_low := #Out2;
+	    #Out_high := #Out3;
+	ELSIF #In.Value >= #In3 AND #In.Value < #In4 THEN
+	    #In_low := #In3;
+	    #In_high := #In4;
+	    #Out_low := #Out3;
+	    #Out_high := #Out4;
+	ELSIF #In.Value >= #In4 AND #In.Value < #In5 THEN
+	    #In_low := #In4;
+	    #In_high := #In5;
+	    #Out_low := #Out4;
+	    #Out_high := #Out5;
+	ELSIF #In.Value >= #In5 AND #In.Value < #In6 THEN
+	    #In_low := #In5;
+	    #In_high := #In6;
+	    #Out_low := #Out5;
+	    #Out_high := #Out6;
+	ELSIF #In.Value >= #In6 AND #In.Value < #In7 THEN
+	    #In_low := #In6;
+	    #In_high := #In7;
+	    #Out_low := #Out6;
+	    #Out_high := #Out7;
+	ELSIF #In.Value >= #In7 AND #In.Value < #In8 THEN
+	    #In_low := #In7;
+	    #In_high := #In8;
+	    #Out_low := #Out7;
+	    #Out_high := #Out8;
+	ELSIF #In.Value >= #In8 AND #In.Value < #In9 THEN
+	    #In_low := #In8;
+	    #In_high := #In9;
+	    #Out_low := #Out8;
+	    #Out_high := #Out9;
+	ELSIF #In.Value >= #In9 AND #In.Value < #In10 THEN
+	    #In_low := #In9;
+	    #In_high := #In10;
+	    #Out_low := #Out9;
+	    #Out_high := #Out10;
+	ELSIF #In.Value >= #In10 AND #In.Value < #In11 THEN
+	    #In_low := #In10;
+	    #In_high := #In11;
+	    #Out_low := #Out10;
+	    #Out_high := #Out11;
+	ELSIF #In.Value >= #In11 AND #In.Value < #In12 THEN
+	    #In_low := #In11;
+	    #In_high := #In12;
+	    #Out_low := #Out11;
+	    #Out_high := #Out12;
+	ELSIF #In.Value >= #In12 AND #In.Value < #In13 THEN
+	    #In_low := #In12;
+	    #In_high := #In13;
+	    #Out_low := #Out12;
+	    #Out_high := #Out13;
+	ELSIF #In.Value >= #In13 AND #In.Value < #In14 THEN
+	    #In_low := #In13;
+	    #In_high := #In14;
+	    #Out_low := #Out13;
+	    #Out_high := #Out14;
+	ELSIF #In.Value >= #In14 AND #In.Value < #In15 THEN
+	    #In_low := #In14;
+	    #In_high := #In15;
+	    #Out_low := #Out14;
+	    #Out_high := #Out15;
+	ELSIF #In.Value >= #In15 THEN
+	    #In_low := #In15;
+	    #In_high := #In16;
+	    #Out_low := #Out15;
+	    #Out_high := #Out16;
+	END_IF;
+	
+	// выход для каскада
+	#CasOut.In := #In;
+	#CasOut.In16 := #In16;
+	#CasOut.Out16 := #Out16;
+	
+	#Out.ST := #In.ST;
+END_FUNCTION_BLOCK
+
